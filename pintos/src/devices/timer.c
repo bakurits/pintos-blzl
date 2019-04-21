@@ -102,7 +102,6 @@ timer_sleep (int64_t ticks)
   struct thread* t = thread_current();
   t->awake_time = start + ticks;
   
-  list_remove(&(t->elem));
   thread_block();
   
   intr_set_level (old_level);

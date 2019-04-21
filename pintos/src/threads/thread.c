@@ -552,11 +552,11 @@ thread_schedule_tail (struct thread *prev)
 void check_thread_state (struct thread *t, void *aux) {
   if (t->awake_time == -1) return;
   
-  if (t->status == THREAD_BLOCKED && t->awake_time < timer_ticks()) {
+  if (t->status == THREAD_BLOCKED && t->awake_time <= timer_ticks()) {
     t->awake_time = -1;
     thread_unblock(t);
   }
-}
+} 
 
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
@@ -569,7 +569,6 @@ static void
 schedule (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
-  
   thread_foreach(check_thread_state, NULL);
 
   struct thread *cur = running_thread ();
