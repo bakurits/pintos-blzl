@@ -263,6 +263,9 @@ thread_current (void)
      of stack, so a few big automatic arrays or moderate
      recursion can cause stack overflow. */
   ASSERT (is_thread (t));
+  if (t->status != THREAD_RUNNING) {
+    PANIC("\n%s %d\n", t->name, t->status);
+  }
   ASSERT (t->status == THREAD_RUNNING);
 
   return t;
@@ -462,6 +465,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->awake_time = -1;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -542,6 +546,18 @@ thread_schedule_tail (struct thread *prev)
     }
 }
 
+/**
+ *  Check if thread sleep period is over
+ */
+void check_thread_state (struct thread *t, void *aux) {
+  if (t->awake_time == -1) return;
+  
+  if (t->status == THREAD_BLOCKED && t->awake_time < timer_ticks()) {
+    t->awake_time = -1;
+    thread_unblock(t);
+  }
+}
+
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
    running to some other state.  This function finds another
@@ -552,11 +568,15 @@ thread_schedule_tail (struct thread *prev)
 static void
 schedule (void)
 {
+  ASSERT (intr_get_level () == INTR_OFF);
+  
+  thread_foreach(check_thread_state, NULL);
+
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
 
-  ASSERT (intr_get_level () == INTR_OFF);
+
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
 
