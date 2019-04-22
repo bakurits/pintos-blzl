@@ -27,7 +27,7 @@ static unsigned loops_per_tick;
 
 
 /* List of sleeping threads */
-static struct list sleeping_threads;
+extern struct list sleeping_list;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -42,7 +42,6 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  list_init(&sleeping_threads);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -101,13 +100,13 @@ timer_sleep (int64_t ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
 
-  enum intr_level old_level;
-  old_level = intr_disable();
-  
   struct thread* t = thread_current();
   t->awake_time = start + ticks;
 
-  list_insert_ordered(&sleeping_threads, &t->elem, thread_awake_time_cmp, NULL);
+  enum intr_level old_level;
+  old_level = intr_disable();
+  
+  list_insert_ordered(&sleeping_list, &t->elem, thread_awake_time_cmp, NULL);
   thread_block();
   
   intr_set_level (old_level);
@@ -183,30 +182,13 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* This method awakes threads */
-void awake_threads () {
-
-  ASSERT (intr_get_level () == INTR_OFF);
-  
-  while (!list_empty(&sleeping_threads)) {
-    struct list_elem *e = list_front (&sleeping_threads);
-    struct thread *t = list_entry (e, struct thread, elem);
-    if (t->awake_time <= ticks) {
-        list_remove(e);
-        t->awake_time = -1;
-        thread_unblock(t);
-    } else {
-      break;
-    }
-  }
-} 
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  awake_threads();
+  awake_threads(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

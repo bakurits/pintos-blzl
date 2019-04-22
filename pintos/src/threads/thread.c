@@ -24,6 +24,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of sleeping threads */
+struct list sleeping_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -91,6 +94,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleeping_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -542,6 +546,25 @@ thread_schedule_tail (struct thread *prev)
       ASSERT (prev != cur);
       palloc_free_page (prev);
     }
+}
+
+/* Wake up threads which sleeping time expired */
+void awake_threads (int64_t cur_tick) {
+
+  ASSERT (intr_get_level () == INTR_OFF);
+  
+  while (!list_empty(&sleeping_list)) {
+    struct list_elem *e = list_front (&sleeping_list);
+    struct thread *t = list_entry (e, struct thread, elem);
+    if (t->awake_time <= cur_tick) {
+        list_remove(e);
+        t->awake_time = -1;
+        thread_unblock(t);
+    } else {
+      break;
+    }
+  }
+
 }
 
 // Compare two threads awake time, less is better
