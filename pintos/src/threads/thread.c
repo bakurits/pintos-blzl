@@ -326,12 +326,10 @@ thread_foreach (thread_action_func *func, void *aux)
 
   ASSERT (intr_get_level () == INTR_OFF);
 
-  for (e = list_begin (&all_list); e != list_end (&all_list);
-       e = list_next (e))
-    {
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
-    }
+  }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -546,17 +544,12 @@ thread_schedule_tail (struct thread *prev)
     }
 }
 
-/**
- *  Check if thread sleep period is over
- */
-void check_thread_state (struct thread *t, void *aux) {
-  if (t->awake_time == -1) return;
-  
-  if (t->status == THREAD_BLOCKED && t->awake_time <= timer_ticks()) {
-    t->awake_time = -1;
-    thread_unblock(t);
-  }
-} 
+// Compare two threads awake time, less is better
+bool thread_awake_time_cmp (const struct list_elem *a, const struct list_elem *b, void *aux) {
+  struct thread *f = list_entry (a, struct thread, elem);
+  struct thread *s = list_entry (b, struct thread, elem);
+  return f->awake_time < s->awake_time;
+}
 
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
@@ -569,12 +562,10 @@ static void
 schedule (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
-  thread_foreach(check_thread_state, NULL);
 
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
-
 
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
