@@ -143,5 +143,6 @@ int thread_get_load_avg (void);
 
 
 bool thread_awake_time_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* threads/thread.h */

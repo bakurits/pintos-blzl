@@ -494,8 +494,12 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else {
+    struct list_elem* e = list_max(&ready_list, thread_priority_cmp, NULL);
+    struct thread* t = list_entry (e, struct thread, elem);
+    list_remove (e);
+    return t;
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -544,11 +548,18 @@ thread_schedule_tail (struct thread *prev)
     }
 }
 
-// Compare two threads awake time, less is better
+// Compare two threads by awake time, less is better
 bool thread_awake_time_cmp (const struct list_elem *a, const struct list_elem *b, void *aux) {
   struct thread *f = list_entry (a, struct thread, elem);
   struct thread *s = list_entry (b, struct thread, elem);
   return f->awake_time < s->awake_time;
+}
+
+// Compare two threads by priority, less is better
+bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux) {
+  struct thread *f = list_entry (a, struct thread, elem);
+  struct thread *s = list_entry (b, struct thread, elem);
+  return f->priority < s->priority;
 }
 
 /* Schedules a new process.  At entry, interrupts must be off and
