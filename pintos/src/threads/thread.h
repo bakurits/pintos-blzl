@@ -141,7 +141,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-
+void awake_threads (int64_t cur_tick);
 bool thread_awake_time_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
 
