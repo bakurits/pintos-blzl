@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
+ 
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -103,8 +104,11 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-  };
 
+    int nice;
+    fixed_point_t recent_cpu; 
+  };
+fixed_point_t load_avg ;
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */

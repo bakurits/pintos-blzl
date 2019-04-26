@@ -74,8 +74,7 @@ test_mlfqs_fair (int thread_cnt, int nice_min, int nice_step)
   ASSERT (thread_cnt <= MAX_THREAD_CNT);
   ASSERT (nice_min >= -10);
   ASSERT (nice_step >= 0);
-  ASSERT (nice_min + nice_step * (thread_cnt - 1) <= 20);
-
+  ASSERT (nice_min + nice_step * (thread_cnt - 1) <= 20); 
   thread_set_nice (-20);
 
   start_time = timer_ticks ();
