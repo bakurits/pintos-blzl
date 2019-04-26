@@ -6,3 +6,4 @@
 pintos/**/build
 *.ipch
 *.bin
+/.vscode
