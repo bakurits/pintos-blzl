@@ -46,6 +46,7 @@ void sema_init(struct semaphore *sema, unsigned value)
 	ASSERT(sema != NULL);
 
 	sema->value = value;
+  	sema->max_priority = 0;
 	list_init(&sema->waiters);
 }
 
@@ -67,6 +68,12 @@ void sema_down(struct semaphore *sema)
 	while (sema->value == 0)
 	{
 		list_push_back(&sema->waiters, &thread_current()->elem);
+		/* struct list_elem* e = &thread_current()->elem;
+		struct thread* t = list_entry(e, struct thread, elem);
+		list_push_back(&sema->waiters, e);
+		if (sema->max_priority < t->priority) {
+			sema->max_priority = t->priority;
+		} */
 		thread_block();
 	}
 	sema->value--;
@@ -98,6 +105,17 @@ bool sema_try_down(struct semaphore *sema)
 	return success;
 }
 
+// Updates semaphore's max priority 
+void sema_change_max_prior(struct semaphore *sema) {
+	if (list_empty(&sema->waiters)) {
+			sema->max_priority = 0;
+	} else {
+		struct list_elem *e = list_max(&(sema->waiters), thread_priority_cmp, NULL);
+    	struct thread *t = list_entry(e, struct thread, elem);
+		sema->max_priority = t->priority;
+	}
+}
+
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
@@ -111,9 +129,10 @@ void sema_up(struct semaphore *sema)
 	old_level = intr_disable();
 	if (!list_empty(&sema->waiters)) {
 		struct list_elem *e = list_max(&(sema->waiters), thread_priority_cmp, NULL);
-        struct thread *t = list_entry(e, struct thread, elem);
-        list_remove(e);
-        thread_unblock(t);
+    	struct thread *t = list_entry(e, struct thread, elem);
+    	list_remove(e);
+		sema_change_max_prior(sema);
+		thread_unblock(t);
 	}
 	sema->value++;
 	intr_set_level(old_level);
@@ -286,10 +305,19 @@ void cond_wait(struct condition *cond, struct lock *lock)
 	ASSERT(lock_held_by_current_thread(lock));
 
 	sema_init(&waiter.semaphore, 0);
+	waiter.semaphore.max_priority = thread_current()->priority;
 	list_push_back(&cond->waiters, &waiter.elem);
 	lock_release(lock);
 	sema_down(&waiter.semaphore);
 	lock_acquire(lock);
+}
+
+// Compare two semaphores by their priorities
+bool sema_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct semaphore_elem *f = list_entry(a, struct semaphore_elem, elem);
+	struct semaphore_elem *s = list_entry(b, struct semaphore_elem, elem);
+	return f->semaphore.max_priority < s->semaphore.max_priority;
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -307,10 +335,10 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 	ASSERT(lock_held_by_current_thread(lock));
 
 	if (!list_empty(&cond->waiters)) {
-		struct list_elem* e = list_max(&(cond->waiters), thread_priority_cmp, NULL);
-        struct semaphore_elem* se = list_entry (e, struct semaphore_elem, elem);
+		struct list_elem* e = list_max(&(cond->waiters), sema_priority_cmp, NULL);
+        struct semaphore* sema = &(list_entry (e, struct semaphore_elem, elem)->semaphore);
         list_remove (e);
-        sema_up (se);
+        sema_up (sema);
 	}
 }
 
