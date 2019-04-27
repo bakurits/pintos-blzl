@@ -4,6 +4,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+int max(int a, int b) {
+  if (a >= b)
+    return a;
+  return b;
+}
+
 /* Converts a string representation of a signed decimal integer
    in S into an `int', which is returned. */
 int

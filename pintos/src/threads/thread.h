@@ -89,12 +89,16 @@ struct thread {
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
+    int priority;                       /* Current priority, used for scheduling. */
+	int pure_priority;					/* Priority set when created or with thread_set_priority() */
     int64_t awake_time;                 /* Time on which awake is scheduled */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+	struct lock* blocked_by;			/* Thread is blocked by this lock (NULL if not blocked) */
+    struct list acquired_locks;			/* List of locks, this thread has currently acquired */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -149,5 +153,8 @@ int thread_get_load_avg (void);
 void awake_threads (int64_t cur_tick);
 bool thread_awake_time_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
+
+void thread_update_prior();
+void donate_priority();
 
 #endif /* threads/thread.h */

@@ -359,7 +359,13 @@ void thread_foreach(thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
+	thread_current()->pure_priority = new_priority;
 	thread_current()->priority = new_priority;
+	
+	enum intr_level old_level = intr_disable();
+	thread_update_prior();
+	intr_set_level(old_level);
+
 	thread_yield ();
 }
 
@@ -531,8 +537,12 @@ init_thread(struct thread *t, const char *name, int priority)
 	strlcpy(t->name, name, sizeof t->name);
 	t->stack = (uint8_t *)t + PGSIZE;
 	t->priority = priority; 
+	t->pure_priority = priority;
 	t->awake_time = -1;
 	t->magic = THREAD_MAGIC;
+
+	t->blocked_by = NULL;
+	list_init(&t->acquired_locks);
 
 	old_level = intr_disable();
 	list_push_back(&all_list, &t->allelem);
@@ -675,6 +685,32 @@ schedule(void)
 		prev = switch_threads(cur, next);
 	thread_schedule_tail(prev); 
 }
+
+void thread_update_prior() {
+	ASSERT(intr_get_level() == INTR_OFF);
+
+	struct thread* t = thread_current();
+	int priority = t->pure_priority;	// start with pure priority
+	struct list_elem* e;
+	for (e = list_begin(&t->acquired_locks); e != list_end(&t->acquired_locks); e = list_next(e)) {
+		struct lock* l = list_entry(e, struct lock, elem);
+		priority = max(priority, l->semaphore.max_priority);
+	}
+	t->priority = priority;
+}
+
+void donate_priority() {
+	struct thread* t = thread_current();
+	struct lock* l = t->blocked_by;
+
+	while (l != NULL) {
+		l->semaphore.max_priority = max(l->semaphore.max_priority, t->priority);
+		t = l->holder;
+		t->priority = max(t->priority, l->semaphore.max_priority);
+		l = t->blocked_by;
+	}
+}
+
 
 /* Returns a tid to use for a new thread. */
 static tid_t

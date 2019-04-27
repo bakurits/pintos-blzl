@@ -73,6 +73,10 @@ void sema_down(struct semaphore *sema)
 		if (sema->max_priority < t->priority) {
 			sema->max_priority = t->priority;
 		}
+
+		if (!thread_mlfqs)
+			donate_priority();
+
 		thread_block();
 	}
 	sema->value--;
@@ -217,8 +221,13 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
+	enum intr_level old_level = intr_disable();
+	thread_current()->blocked_by = lock;
 	sema_down(&lock->semaphore);
+	thread_current()->blocked_by = NULL;
+	list_push_back(&thread_current()->acquired_locks, &lock->elem);
 	lock->holder = thread_current();
+	intr_set_level(old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -240,6 +249,7 @@ bool lock_try_acquire(struct lock *lock)
 	return success;
 }
 
+
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
@@ -250,8 +260,12 @@ void lock_release(struct lock *lock)
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
+	enum intr_level old_level = intr_disable();
 	lock->holder = NULL;
+	list_remove(&lock->elem);
+	thread_update_prior();
 	sema_up(&lock->semaphore);
+	intr_set_level(old_level);
 }
 
 /* Returns true if the current thread holds LOCK, false
