@@ -74,10 +74,7 @@ static void *alloc_frame(struct thread *, size_t size);
 static void schedule(void);
 void thread_schedule_tail(struct thread *prev);
 static tid_t allocate_tid(void);
-
-static void calculate_recent_cpu_advanced(struct thread *,void *);
-static void calculate_new_load_avg (void);
-static void calculate_new_recent_cpu (void);
+ 
  
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -142,10 +139,16 @@ void thread_tick(void)
 		if (t != idle_thread){
 		  thread_current ()->recent_cpu = fix_add(thread_current ()->recent_cpu, fix_int(1)); 
 		}
-		if (timer_ticks() % TIMER_FREQ == 0){
+		if (timer_ticks()%TIMER_FREQ==0){
 			  calculate_new_load_avg();
-			  calculate_new_recent_cpu(); 
-		}
+			  calculate_new_recent_cpu();    
+        calculate_new_mlfq_priority();
+				intr_yield_on_return();  
+		} 
+		if (timer_ticks()%TIME_SLICE==0){
+        mlfq_priority_update(thread_current(), NULL); 
+        intr_yield_on_return();
+    }
 	}
 
 	/* Update statistics. */
@@ -209,7 +212,8 @@ tid_t thread_create(const char *name, int priority,
 
 	t->nice = thread_current ()->nice;
 	t->recent_cpu = thread_current ()->recent_cpu;
-  	   
+  if (thread_mlfqs) mlfq_priority_update (t, NULL);
+
 	/* Stack frame for kernel_thread(). */
 	kf = alloc_frame(t, sizeof *kf);
 	kf->eip = NULL;
@@ -359,6 +363,7 @@ void thread_foreach(thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
+	if (thread_mlfqs) return;
 	thread_current()->pure_priority = new_priority;
 	thread_current()->priority = new_priority;
 	
@@ -379,10 +384,8 @@ int thread_get_priority(void)
 void thread_set_nice(int nice UNUSED)
 {
 	 thread_current()->nice=nice;
-	 enum intr_level old_level = intr_disable();
-
-	//update  priority
-	 intr_set_level(old_level); 
+	 mlfq_priority_update (thread_current (), NULL);
+	 thread_yield ();
 }
 
 /* Returns the current thread's nice value. */
@@ -404,14 +407,18 @@ int thread_get_recent_cpu(void)
 	return fix_round(fix_mul(fix_int(100),thread_current()->recent_cpu)); 
 }
 
-
-//update current value of recent_cpu
+//Update current value of recent_cpu for each threads
 void calculate_new_recent_cpu(void){
-	  thread_foreach (calculate_recent_cpu_advanced, NULL);
+	  thread_foreach (recent_cpu_update, NULL);
+} 
+
+//Update current priorities of mlfq for each thread
+void calculate_new_mlfq_priority(void){
+	  thread_foreach (mlfq_priority_update, NULL); 
 }
 
-//this method would be called for each thread to calculate new cpu
-void calculate_recent_cpu_advanced (struct thread *t, void *aux)
+//this method would be called for each thread to calculate new cpu - aux not used
+void recent_cpu_update (struct thread *t, void *aux)
 {
 	//t->recent_cpu=load_avg*2/(2*load_avg+1)*t->recent_cpu+t->nice;
 	t->recent_cpu=fix_add(
@@ -429,15 +436,24 @@ void calculate_recent_cpu_advanced (struct thread *t, void *aux)
 				  );
 }
 
-//update current value of load_avg
-void calculate_new_load_avg(void){
-	// load_avg=fix_int(4);
-	// return; 
-	fixed_point_t learned = fix_mul(fix_int(59), load_avg);
-	fixed_point_t sample = fix_int(get_ready_threads_count());
+//Updates priority for thread t - aux not used
+void mlfq_priority_update(struct thread *t, void *aux)
+{
+ 	//priority = PRI_MAX − (recent_cpu/4) − (nice × 2)
+ 	t->priority=PRI_MAX- fix_round(fix_unscale(t->recent_cpu,4))-(t->nice*2);
+}
 
-	load_avg = fix_div(fix_add(learned, sample), fix_int(60));
-	//load_avg = (59/60) × load_avg + (1/60) × ready_threads 
+//update current value of load_avg
+void calculate_new_load_avg(void){ 
+	//load_avg = (59/60) × load_avg + (1/60) × ready_threads  
+	load_avg = fix_div(
+									fix_add(
+												fix_mul(fix_int(59), load_avg), 
+												fix_int(get_ready_threads_count()
+												)
+									), 
+									fix_int(60)
+							); 
 }
 
 //Returns "number of threads that are either running or ready to run at time of update"

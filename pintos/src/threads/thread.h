@@ -157,4 +157,10 @@ bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, 
 void thread_update_prior();
 void donate_priority();
 
+
+static void mlfq_priority_update(struct thread *,void *);
+static void recent_cpu_update(struct thread *,void *);
+static void calculate_new_load_avg (void);
+static void calculate_new_recent_cpu (void);
+
 #endif /* threads/thread.h */
