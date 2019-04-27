@@ -72,7 +72,7 @@ void sema_down(struct semaphore *sema)
 		list_push_back(&sema->waiters, e);
 		if (sema->max_priority < t->priority) {
 			sema->max_priority = t->priority;
-		} 
+		}
 		thread_block();
 	}
 	sema->value--;

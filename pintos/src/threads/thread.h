@@ -83,8 +83,7 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-struct thread
-  {
+struct thread {
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
@@ -102,13 +101,15 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
-
     int nice;
     fixed_point_t recent_cpu; 
-  };
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
+};
+
 fixed_point_t load_avg ;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */

@@ -138,12 +138,11 @@ void thread_tick(void)
 {
 	struct thread *t = thread_current();
 
-	if (thread_mlfqs)
-    { 
-		if (t!=idle_thread){
-		  thread_current ()->recent_cpu=fix_add(thread_current ()->recent_cpu,fix_int(1)); 
+	if (thread_mlfqs) { 
+		if (t != idle_thread){
+		  thread_current ()->recent_cpu = fix_add(thread_current ()->recent_cpu, fix_int(1)); 
 		}
-		if (timer_ticks() % TIMER_FREQ ==0){
+		if (timer_ticks() % TIMER_FREQ == 0){
 			  calculate_new_load_avg();
 			  calculate_new_recent_cpu(); 
 		}
@@ -160,13 +159,12 @@ void thread_tick(void)
 		kernel_ticks++;
 
 
-	
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return();
 
-	 
-}  
+}
+
 /* Prints thread statistics. */
 void thread_print_stats(void)
 {
@@ -429,23 +427,17 @@ void calculate_recent_cpu_advanced (struct thread *t, void *aux)
 void calculate_new_load_avg(void){
 	// load_avg=fix_int(4);
 	// return; 
-	load_avg=fix_div( 
-					fix_add(
-							fix_mul(
-									fix_int(59),
-									load_avg
-									),
-							fix_int(get_ready_threads_count())
-					),
-					fix_int(60)
-			  );  
+	fixed_point_t learned = fix_mul(fix_int(59), load_avg);
+	fixed_point_t sample = fix_int(get_ready_threads_count());
+
+	load_avg = fix_div(fix_add(learned, sample), fix_int(60));
 	//load_avg = (59/60) × load_avg + (1/60) × ready_threads 
 }
 
 //Returns "number of threads that are either running or ready to run at time of update"
 int get_ready_threads_count(){ 
-	int cnt=list_size(&ready_list);
-	if (thread_current()!=idle_thread) cnt++;
+	int cnt = list_size(&ready_list);
+	if (thread_current() != idle_thread) cnt++;
 	return cnt;
 }
 
@@ -631,18 +623,14 @@ void awake_threads(int64_t cur_tick)
 
 	ASSERT(intr_get_level() == INTR_OFF);
 
-	while (!list_empty(&sleeping_list))
-	{
+	while (!list_empty(&sleeping_list)) {
 		struct list_elem *e = list_front(&sleeping_list);
 		struct thread *t = list_entry(e, struct thread, elem);
-		if (t->awake_time <= cur_tick)
-		{
+		if (t->awake_time <= cur_tick) {
 			list_remove(e);
 			t->awake_time = -1;
 			thread_unblock(t);
-		}
-		else
-		{
+		} else {
 			break;
 		}
 	}
