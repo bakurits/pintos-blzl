@@ -87,3 +87,65 @@ void mlfq_priority_update(struct thread *t)
 load_avg = (59/60) × load_avg + (1/60) × ready_threads
 ```
 რომელიც გლობალურად უნდა დაითვალოს წამში TIMER_FREQ-ჯერ.
+
+# 2.1.2 Additional Questions
+
+### Test
+```c
+void test(void)
+{
+    thread_set_priority (PRI_DEFAULT-2);
+    struct semaphore sema;
+    sema_init(&sema, 0);
+    thread_create("test_thread", PRI_DEFAULT, test_thread_func, &sema);    
+    thread_create("second_test_thread", PRI_DEFAULT+1, second_test_thread_func, &sema);    
+    thread_create("just_thread", PRI_DEFAULT-1, just_thread_func, NULL);
+    msg("in main");
+    sema_up(&sema);
+    sema_up(&sema);
+    msg("main thread finished");
+}
+
+void test_thread_func(void *s)
+{
+    msg("test_thread started");
+    struct semaphore *sema = s;
+    sema_down (sema);
+    msg("test_thread after sema_down");
+}
+
+void second_test_thread_func(void *s)
+{
+    msg("second_test_thread started");
+    struct semaphore *sema = s;
+    sema_down (sema);
+    msg("second_test_thread after sema_down");
+}
+
+void just_thread_func(void *s)
+{
+    msg("just_thread printing just text");
+}
+```
+ამ ტესტზე სწორი პასუხია:
+```
+test_thread started
+second_test_thread started
+in main
+second_test_thread after sema_down
+test_thread after sema_down
+just_thread printing just text
+main thread finished
+```
+აღწერილი იმპლემენაცია კი გამოიტანს შემდეგს:
+```c
+test_thread started
+second_test_thread started
+just_thread printing just test
+in_main
+test_thread after sema_down
+second_test_thread after sema_down
+main thread finished
+```
+
+როგორც ვხედავთ აღწერილმა იმპლემენტაციამ სემაფორის მომატებისას არც დაბლოკილი ნაკადების პრიორიტეტები გაითვალისწინა (test_thread უფრო მალე განიბლოკა ვიდრე second_test_thread) და არც priority_donation-ს მიაქცია ყურადღება (just_thread გაუშვა მაშინ, როდესაც main უნდა გაეშვა).
