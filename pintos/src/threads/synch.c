@@ -32,6 +32,10 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+
+void sema_change_max_prior(struct semaphore *sema);
+bool sema_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -333,7 +337,7 @@ void cond_wait(struct condition *cond, struct lock *lock)
 }
 
 // Compare two semaphores by their priorities
-bool sema_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux)
+bool sema_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
 	struct semaphore_elem *f = list_entry(a, struct semaphore_elem, elem);
 	struct semaphore_elem *s = list_entry(b, struct semaphore_elem, elem);

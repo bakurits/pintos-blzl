@@ -120,6 +120,7 @@ fixed_point_t load_avg ;
 extern bool thread_mlfqs;
 
 void thread_init (void);
+
 void thread_start (void);
 
 void thread_tick (void);
@@ -153,14 +154,9 @@ int thread_get_load_avg (void);
 void awake_threads (int64_t cur_tick);
 bool thread_awake_time_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool lock_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
 
-void thread_update_prior();
-void donate_priority();
-
-
-static void mlfq_priority_update(struct thread *,void *);
-static void recent_cpu_update(struct thread *,void *);
-static void calculate_new_load_avg (void);
-static void calculate_new_recent_cpu (void);
+void thread_update_prior(void);
+void donate_priority(void);
 
 #endif /* threads/thread.h */
