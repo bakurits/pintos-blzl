@@ -62,3 +62,28 @@ thread->blocked_by != NULL
 
 [f2]: http://chart.apis.google.com/chart?cht=tx&chl=O(1)&chf=bg,s,FFFFFF00
 [f3]: http://chart.apis.google.com/chart?cht=tx&chl=O(n)&chf=bg,s,FFFFFF00
+
+
+#  Multi-level Feedback Queue Scheduler (MLFQS)
+ამ ტიპის scheduler-ში თითეული Thread-ისთვის პრიორიტეტი, ყოველ მე-4 ***Tick***-ზე შემდეგი ფორმულით გამოითვლება:
+```
+priority = PRI_MAX − (recent_cpu/4) − (nice × 2)
+```
+ 
+იმისთვის რომ ყველა Thread-ისთვის ყოველ მე-4 Tick-ზე შეგვეცვალა ეს პრიორიტეტი, thread_foreach მეთოდს გადავცემთ ***mlfq_priority_update*** მეთოდს:
+```c
+void mlfq_priority_update(struct thread *t)
+``` 
+ რომელიც გამოიძახებს და შეცვლის პრიორიტეტს ამ მეთოდით, განახლებული recent_cpu და nice მნიშვნელობითურთ.
+
+***recent_cpu*** გამოითვლება შემდეგი ფორმულით:
+```
+ recent_cpu = (2 × load_avg)/(2 × load_avg + 1) × recent_cpu + nice
+ ```
+ ეს მნიშვნელობა ყველა Thread-თვის სათითაოდ უნდა დაითვალოს, ამიტომ მასაც  thread_foreach მეთოდს გადავცემთ, მას შემდეგ რაც ***load_avg*** მნიშვნელობა იქნება დათვლილი.
+
+***load_avg*** მნიშვნელობა გამოითვლება ფორმულით:
+```
+load_avg = (59/60) × load_avg + (1/60) × ready_threads
+```
+რომელიც გლობალურად უნდა დაითვალოს წამში TIMER_FREQ-ჯერ.
