@@ -51,10 +51,68 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
 	syscall_func_arr[args[0]](f, args);
 }
 
+static void syscall_halt (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
 static void syscall_exit (struct intr_frame *f UNUSED, uint32_t *args) {
     f->eax = args[1];
     printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
     thread_exit();
+}
+
+static void syscall_exec (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_wait (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_create (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_remove (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_open (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_filesize (struct intr_frame *f UNUSED, uint32_t *args) { 
+
+}
+
+
+static void syscall_read (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_write (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_seek (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_tell (struct intr_frame *f UNUSED, uint32_t *args) {
+
+}
+
+
+static void syscall_close (struct intr_frame *f UNUSED, uint32_t *args) {
+	
 }
 
 static void syscall_practice (struct intr_frame *f UNUSED, uint32_t *args) {
