@@ -52,7 +52,7 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
 }
 
 static void syscall_halt (struct intr_frame *f UNUSED, uint32_t *args) {
-
+	//lasha test
 }
 
 static void syscall_exit (struct intr_frame *f UNUSED, uint32_t *args) {
