@@ -51,8 +51,9 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
 	syscall_func_arr[args[0]](f, args);
 }
 
+
 static void syscall_halt (struct intr_frame *f UNUSED, uint32_t *args) {
-	//lasha test
+ 	shutdown_power_off();
 }
 
 static void syscall_exit (struct intr_frame *f UNUSED, uint32_t *args) {
@@ -104,7 +105,6 @@ static void syscall_write (struct intr_frame *f UNUSED, uint32_t *args) {
 static void syscall_seek (struct intr_frame *f UNUSED, uint32_t *args) {
 
 }
-
 
 static void syscall_tell (struct intr_frame *f UNUSED, uint32_t *args) {
 
