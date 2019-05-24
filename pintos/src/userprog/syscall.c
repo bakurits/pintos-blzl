@@ -3,11 +3,15 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/process.h"
 
+
+static struct lock syscall_lock;
 static void syscall_handler(struct intr_frame *);
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&syscall_lock);
 }
 
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args);
@@ -54,7 +58,16 @@ static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
   }
 }
 
-static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
+	lock_acquire (&syscall_lock);
+	__pid_t process_pid =  process_execute ((char*)args[1]);
+	f->eax = process_pid;
+	if (process_pid != TID_ERROR) {
+		process_exit ();
+	}
+
+	lock_release (&syscall_lock);
+}
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
   __pid_t pid = args[1];
