@@ -39,7 +39,7 @@ static size_t get_args_cnt(const char *st) {
 struct args_data_t {
   	size_t argc;
   	char **argv;
-	tid_t status;
+	bool status;
 	struct semaphore load_status_sem;
 };
 
@@ -106,12 +106,15 @@ tid_t process_execute(const char *args) {
   struct args_data_t data;
   data.argc = argc;
   data.argv = argv;
-  data.status = tid;
   sema_init (&data.load_status_sem, 0);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create(argv[0], PRI_DEFAULT, start_process, &data);
 	sema_down (&data.load_status_sem);
 
+	
+	if (data.status == false) {
+		return -1;
+	}
   if (tid == TID_ERROR) palloc_free_page(fn_copy);
   return data.status;
 }
@@ -137,9 +140,9 @@ static void start_process(void *argv) {
   palloc_free_page(args_data->argv[0]);
   int sz = PHYS_BASE - if_.esp;
   hex_dump(0, if_.esp, sz, true);
+	args_data->status = success;
 
-  if (success) {
-	  args_data->status = TID_ERROR;
+  if (!success) {
 	  thread_exit();
   }
 
