@@ -114,8 +114,6 @@ struct thread {
   struct thread *parent_thread;
   struct list children; /* child threads */
 #endif
-  struct thread *parent_thread;
-  struct list children; /* child threads */
 
   int nice;
   fixed_point_t recent_cpu;

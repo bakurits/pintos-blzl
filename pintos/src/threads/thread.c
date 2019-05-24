@@ -567,7 +567,6 @@ static struct thread *next_thread_to_run(void) {
 }
 
 static void free_child_list(struct thread *t) {
-  struct list_elem *e;
   while (!list_empty(&t->children)) {
     struct list_elem *e = list_pop_back(&t->children);
     free(list_entry(e, struct child_info, elem));

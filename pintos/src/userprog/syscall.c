@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
@@ -57,7 +58,7 @@ static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {}
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
-  __pid_t pid = args[1];
+  tid_t pid = args[1];
   f->eax = process_wait(pid);
 }
 
