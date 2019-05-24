@@ -334,8 +334,6 @@ when it calls thread_schedule_tail(). */
   list_remove(&thread_current()->allelem);
   struct thread *t = thread_current();
   t->status = THREAD_DYING;
-  struct child_info *child = get_child_info(t);
-  if (child != NULL) sema_up(&child->sema);
   schedule();
 
   NOT_REACHED();
