@@ -37,10 +37,10 @@ static size_t get_args_cnt(const char *st) {
 }
 
 struct args_data_t {
-  	size_t argc;
-  	char **argv;
-	bool status;
-	struct semaphore load_status_sem;
+  size_t argc;
+  char **argv;
+  bool status;
+  struct semaphore load_status_sem;
 };
 
 static void *load_args(void *st_pointer, struct args_data_t *data) {
@@ -106,17 +106,16 @@ tid_t process_execute(const char *args) {
   struct args_data_t data;
   data.argc = argc;
   data.argv = argv;
-  sema_init (&data.load_status_sem, 0);
+  sema_init(&data.load_status_sem, 0);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create(argv[0], PRI_DEFAULT, start_process, &data);
-	sema_down (&data.load_status_sem);
+  sema_down(&data.load_status_sem);
 
-	
-	if (data.status == false) {
-		return -1;
-	}
-  if (tid == TID_ERROR) palloc_free_page(fn_copy);
-  return data.status;
+  if (!data.status) {
+    return TID_ERROR;
+  }
+  return tid;
 }
 
 /* A thread function that loads a user process and starts it
@@ -138,14 +137,11 @@ static void start_process(void *argv) {
 
   /* If load failed, quit. */
   palloc_free_page(args_data->argv[0]);
-  int sz = PHYS_BASE - if_.esp;
-  hex_dump(0, if_.esp, sz, true);
-	args_data->status = success;
+  args_data->status = success;
 
   if (!success) {
-	  thread_exit();
+    thread_exit();
   }
-
 
   /* Start the user process by simulating a return from an
                  interrupt, implemented by intr_exit (in
