@@ -47,14 +47,26 @@ static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = args[1];
   printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
-  struct child_info *child = get_child_info(thread_current());
-  if (child != NULL) child->status = args[1];
   thread_exit();
+  struct child_info *child = get_child_info(thread_current());
+  if (child != NULL) {
+    child->status = args[1];
+    child->child_thread = NULL;
+  }
 }
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {}
 
-static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
+  __pid_t pid = args[1];
+  struct child_info *child = get_child_info(thread_current());
+  if (child == NULL || child->child_thread == NULL) {
+    f->eax = -1;
+    return;
+  }
+  sema_down(&child->sema);
+  f->eax = child->status;
+}
 
 static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {}
 
