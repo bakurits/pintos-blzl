@@ -138,6 +138,7 @@ static void start_process(void *argv) {
   /* If load failed, quit. */
   palloc_free_page(args_data->argv[0]);
   args_data->status = success;
+  sema_up (&(args_data->load_status_sem));
 
   if (!success) {
     thread_exit();
