@@ -218,7 +218,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   // add child to children list
   struct child_info *child_info = malloc(sizeof(struct child_info));
   child_info->child_thread = t;
-  child_info->status = 0;
+  child_info->status = -1;
   sema_init(&child_info->sema, 0);
   list_push_back(&thread_current()->children, &child_info->elem);
 #endif
@@ -310,6 +310,8 @@ recursion can cause stack overflow. */
 /* Returns the running thread's tid. */
 tid_t thread_tid(void) { return thread_current()->tid; }
 
+void thread_remove_child(struct thread *t, tid_t child) {}
+
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void thread_exit(void) {
@@ -324,11 +326,12 @@ and schedule another process.  That process will destroy us
 when it calls thread_schedule_tail(). */
   intr_disable();
   list_remove(&thread_current()->allelem);
-  thread_current()->status = THREAD_DYING;
-#ifdef USERPROG
-  // TODO: deallocate from parent->children() list
-#endif
+  struct thread *t = thread_current();
+  t->status = THREAD_DYING;
+  struct child_info *child = get_child_info(t);
+  if (child != NULL) sema_up(&child->sema);
   schedule();
+
   NOT_REACHED();
 }
 
@@ -559,6 +562,14 @@ static struct thread *next_thread_to_run(void) {
   }
 }
 
+static void free_child_list(struct thread *t) {
+  struct list_elem *e;
+  while (!list_empty(&t->children)) {
+    struct list_elem *e = list_pop_back(&t->children);
+    free(list_entry(e, struct child_info, elem));
+  }
+}
+
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
 
@@ -598,8 +609,10 @@ initial_thread because its memory was not obtained via
 palloc().) */
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) {
     ASSERT(prev != cur);
-#ifdef USERPROG
 
+#ifdef USERPROG
+    free_child_list(prev);
+    thread_remove_child(prev->parent_thread, prev->tid);
     // TODO: remove from parent->children list & free
 #endif
     palloc_free_page(prev);
@@ -705,6 +718,20 @@ static tid_t allocate_tid(void) {
   lock_release(&tid_lock);
 
   return tid;
+}
+
+struct child_info *get_child_info(struct thread *t) {
+  if (t->parent_thread == NULL) {
+    return NULL;
+  }
+  struct thread *parent = t->parent_thread;
+  struct list_elem *e;
+  for (e = list_begin(&parent->children); e != list_end(&parent->children);
+       e = list_next(e)) {
+    struct child_info *child = list_entry(e, struct child_info, elem);
+    return child;
+  }
+  return NULL;
 }
 
 /* Offset of `stack' member within `struct thread'.
