@@ -61,7 +61,7 @@ static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
 	lock_acquire (&syscall_lock);
-	__pid_t process_pid =  process_execute ((char*)args[1]);
+	tid_t process_pid =  process_execute ((char*)args[1]);
 	f->eax = process_pid;
 	if (process_pid != TID_ERROR) {
 		process_exit ();

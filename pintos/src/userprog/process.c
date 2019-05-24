@@ -39,8 +39,8 @@ static size_t get_args_cnt(const char *st) {
 struct args_data_t {
   	size_t argc;
   	char **argv;
-	__pid_t status;
-	struct lock load_status_sem;
+	tid_t status;
+	struct semaphore load_status_sem;
 };
 
 static void *load_args(void *st_pointer, struct args_data_t *data) {
