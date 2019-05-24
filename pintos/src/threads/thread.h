@@ -27,8 +27,8 @@ typedef int tid_t;
 
 struct child_info {
   struct thread *child_thread;
+  int status;
   struct semaphore sema;
-
   struct list_elem elem;
 };
 

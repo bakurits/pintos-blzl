@@ -218,11 +218,12 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   // add child to children list
   struct child_info *child_info = malloc(sizeof(struct child_info));
   child_info->child_thread = t;
+  child_info->status = 0;
   sema_init(&child_info->sema, 0);
   list_push_back(&thread_current()->children, &child_info->elem);
-  tid = t->tid = allocate_tid();
 #endif
 
+  tid = t->tid = allocate_tid();
   t->nice = thread_current()->nice;
   t->recent_cpu = thread_current()->recent_cpu;
   if (thread_mlfqs) mlfq_priority_update(t, NULL);
@@ -598,6 +599,7 @@ palloc().) */
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) {
     ASSERT(prev != cur);
 #ifdef USERPROG
+
     // TODO: remove from parent->children list & free
 #endif
     palloc_free_page(prev);
