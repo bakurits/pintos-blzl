@@ -51,7 +51,6 @@ static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
   struct child_info *child = get_child_info(thread_current());
   if (child != NULL) {
     child->status = args[1];
-    child->child_thread = NULL;
   }
 }
 
@@ -60,12 +59,13 @@ static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {}
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
   __pid_t pid = args[1];
   struct child_info *child = get_child_info(thread_current());
-  if (child == NULL || child->child_thread == NULL) {
+  if (child == NULL) {
     f->eax = -1;
     return;
   }
   sema_down(&child->sema);
   f->eax = child->status;
+  thread_remove_child(child->child_thread);
 }
 
 static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {}

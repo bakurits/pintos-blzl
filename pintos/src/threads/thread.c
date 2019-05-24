@@ -310,7 +310,13 @@ recursion can cause stack overflow. */
 /* Returns the running thread's tid. */
 tid_t thread_tid(void) { return thread_current()->tid; }
 
-void thread_remove_child(struct thread *t, tid_t child) {}
+void thread_remove_child(struct thread *t) {
+  struct child_info *child = get_child_info(t);
+  if (child != NULL) {
+    list_remove(&child->elem);
+    free(child);
+  }
+}
 
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
@@ -612,7 +618,6 @@ palloc().) */
 
 #ifdef USERPROG
     free_child_list(prev);
-    thread_remove_child(prev->parent_thread, prev->tid);
     // TODO: remove from parent->children list & free
 #endif
     palloc_free_page(prev);

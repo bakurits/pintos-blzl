@@ -174,7 +174,7 @@ bool lock_priority_cmp(const struct list_elem *a, const struct list_elem *b,
 void thread_update_prior(void);
 void donate_priority(void);
 
-void thread_remove_child(struct thread *t, tid_t child);
+void thread_remove_child(struct thread *t);
 struct child_info *get_child_info(struct thread *t);
 
 #endif /* threads/thread.h */
