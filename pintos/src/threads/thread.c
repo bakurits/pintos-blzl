@@ -733,7 +733,7 @@ struct child_info_t *get_child_info_t(struct thread *t) {
   struct list_elem *e;
   for (e = list_begin(&parent->children); e != list_end(&parent->children);
        e = list_next(e)) {
-    struct child_info *child = list_entry(e, struct child_info, elem);
+    struct child_info_t *child = list_entry(e, struct child_info_t, elem);
     if (child->child_thread == t) {
       return child;
     }

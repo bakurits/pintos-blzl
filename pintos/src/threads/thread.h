@@ -4,10 +4,9 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "filesys/file.h"
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
-#include "filesys/file.c"
-
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -35,9 +34,9 @@ struct child_info_t {
 };
 
 struct file_info_t {
-	int fd;
-	struct list_elem elem;
-	struct file file_data;
+  int fd;
+  struct list_elem elem;
+  struct file file_data;
 };
 
 /* A kernel thread or user process.

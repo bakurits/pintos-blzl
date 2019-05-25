@@ -1,18 +1,19 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "filesys/filesys.h"
 #include "process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "userprog/process.h"
-#include "filesys/filesys.h"
 
 static struct lock filesys_lock;
 static void syscall_handler(struct intr_frame *);
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&filesys_lock);
+  lock_init(&filesys_lock);
 }
 
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args);
@@ -45,6 +46,16 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
   syscall_func_arr[args[0]](f, args);
 }
 
+static bool valid_ptr(void *ptr, int size) {
+  if (ptr == NULL) return false;
+
+  ptr += size - 1;
+  if (!is_user_vaddr(ptr)) return false;
+  if (pagedir_get_page(thread_current()->pagedir, ptr) == NULL) return false;
+
+  return true;
+}
+
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
   shutdown_power_off();
 }
@@ -61,14 +72,19 @@ static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
-	lock_acquire (&filesys_lock);
-	tid_t process_pid =  process_execute ((char*)args[1]);
-	f->eax = process_pid;
-	if (process_pid != TID_ERROR) {
-		process_exit ();
-	}
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
-	lock_release (&filesys_lock);
+  lock_acquire(&filesys_lock);
+  tid_t process_pid = process_execute((char *)args[1]);
+  f->eax = process_pid;
+  if (process_pid != TID_ERROR) {
+    process_exit();
+  }
+
+  lock_release(&filesys_lock);
 }
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -76,44 +92,77 @@ static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = process_wait(pid);
 }
 
-static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
-static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {}
+  // Your code here
+}
+
+static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
+
+  // Your code here
+}
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
-	lock_acquire (&filesys_lock);
-	char * file_name = (char *) args[1];
-	struct list * process_files = &(thread_current()->files);
-	int new_fd = 0;
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
+  lock_acquire(&filesys_lock);
+  char *file_name = (char *)args[1];
+  struct list *process_files = &(thread_current()->files);
+  int new_fd = 0;
 
-	if (list_empty (process_files)) {
-		new_fd = 2; // non-standard dscriptors start from 2
-	} else {
-		struct file_info_t * front_file_info = list_entry (list_front (process_files), struct file_info_t, elem);
-		int new_fd = front_file_info->fd + 2; 
-	}
+  if (list_empty(process_files)) {
+    new_fd = 2;  // non-standard dscriptors start from 2
+  } else {
+    struct file_info_t *front_file_info =
+        list_entry(list_front(process_files), struct file_info_t, elem);
+    int new_fd = front_file_info->fd + 2;
+  }
 
-	// Get file struct of given path
-	struct file * cur_file_data = filesys_open (file_name);
+  // Get file struct of given path
+  struct file *cur_file_data = filesys_open(file_name);
 
-	// Fill our struct members
-	struct file_info_t * cur_file_info = (struct file_info_t *) malloc (sizeof (struct file_info_t));
-	cur_file_info -> fd = new_fd;
-	cur_file_info -> file_data = *cur_file_data;
+  // Fill our struct members
+  struct file_info_t *cur_file_info =
+      (struct file_info_t *)malloc(sizeof(struct file_info_t));
+  cur_file_info->fd = new_fd;
+  cur_file_info->file_data = *cur_file_data;
 
-	// Add new opened file to list of opened files for this thread
-	list_push_front (&(thread_current()->files), &(cur_file_info -> elem));
+  // Add new opened file to list of opened files for this thread
+  list_push_front(&(thread_current()->files), &(cur_file_info->elem));
 
-
-	lock_release (&filesys_lock);
+  lock_release(&filesys_lock);
 }
 
 static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {}
 
-static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[2], sizeof(void))) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
-static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {}
+  // Your code here
+}
+
+static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[2], sizeof(void))) {
+    thread_exit();
+    NOT_REACHED();
+  }
+
+  // Your code here
+}
 
 static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {}
 
