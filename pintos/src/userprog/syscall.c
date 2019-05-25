@@ -47,8 +47,6 @@ syscall_func_t syscall_func_arr[14] = {
 
 static void syscall_handler(struct intr_frame *f UNUSED) {
   uint32_t *args = ((uint32_t *)f->esp);
-  printf("System call number: %d\n", args[0]);
-
   syscall_func_arr[args[0]](f, args);
 }
 
@@ -111,7 +109,6 @@ static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
     thread_exit();
     NOT_REACHED();
   }
-
   // Your code here
 }
 
@@ -167,11 +164,34 @@ static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args[2], args[3])) {
+  // retrieving fd
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  int fd = *((int *)cur_arg);
+  // retrieving buff pointer
+  cur_arg += sizeof(int);
+  void *buff = *(void **)cur_arg;
+
+  // retrieving size
+  cur_arg += sizeof(void *);
+  off_t sz = *(off_t *)cur_arg;
+
+  // check pointer
+  if (!valid_ptr(buff, sz)) {
     thread_exit();
     NOT_REACHED();
   }
-  // Your code here
+
+  struct file_info_t *file = get_file_info_t(fd);
+
+  if (file == NULL) {
+    thread_exit();
+    NOT_REACHED();
+  }
+
+  lock_acquire(&filesys_lock);
+  f->eax = file_write(file->file_data, buff, sz);
+  lock_release(&filesys_lock);
 }
 
 static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {}
