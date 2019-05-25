@@ -91,7 +91,7 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
 		new_fd = 2; // non-standard dscriptors start from 2
 	} else {
 		struct file_info_t * front_file_info = list_entry (list_front (process_files), struct file_info_t, elem);
-		int new_fd = front_file_info->fd + 2; 
+		new_fd = front_file_info->fd + 2; 
 	}
 
 	// Get file struct of given path

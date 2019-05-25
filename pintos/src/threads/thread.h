@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
-#include "filesys/file.c"
+#include "filesys/file.h"
 
 
 /* States in a thread's life cycle. */
