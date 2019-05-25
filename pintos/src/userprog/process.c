@@ -81,7 +81,6 @@ static void *load_args(void *st_pointer, struct args_data_t *data) {
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *args) {
-
   char *fn_copy;
   tid_t tid;
 
@@ -139,8 +138,9 @@ static void start_process(void *argv) {
   /* If load failed, quit. */
   palloc_free_page(args_data->argv[0]);
   args_data->status = success;
-  sema_up (&(args_data->load_status_sem));
-
+  sema_up(&(args_data->load_status_sem));
+  /* int sz = PHYS_BASE - if_.esp;
+  hex_dump(0, if_.esp, sz, true); */
   if (!success) {
     thread_exit();
   }

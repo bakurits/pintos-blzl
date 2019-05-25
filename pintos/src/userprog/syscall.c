@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include <console.h>
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "devices/shutdown.h"
@@ -66,7 +67,6 @@ static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
 
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
   printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
-  ASSERT(intr_get_level() == INTR_OFF);
   struct child_info_t *child = get_child_info_t(thread_current());
   if (child != NULL) {
     child->status = args[1];
@@ -96,20 +96,36 @@ static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args[1], sizeof(char))) {
+  // retrieving file name
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  char *file_name = *((char **)cur_arg);
+  // retrieving size
+  cur_arg += sizeof(char *);
+  off_t sz = *(off_t *)cur_arg;
+  // check pointer
+  if (!valid_ptr(file_name, sizeof(char))) {
     thread_exit();
     NOT_REACHED();
   }
-
-  // Your code here
+  lock_acquire(&filesys_lock);
+  f->eax = filesys_create(file_name, sz);
+  lock_release(&filesys_lock);
 }
 
 static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args[1], sizeof(char))) {
+  // retrieving file name
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  char *file_name = *((char **)cur_arg);
+  // check pointer
+  if (!valid_ptr(file_name, sizeof(char))) {
     thread_exit();
     NOT_REACHED();
   }
-  // Your code here
+  lock_acquire(&filesys_lock);
+  f->eax = filesys_remove(file_name);
+  lock_release(&filesys_lock);
 }
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -141,7 +157,6 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
   cur_file_info->file_data = cur_file_data;
 
   // Add new opened file to list of opened files for this thread
-  ASSERT(intr_get_level() == INTR_OFF);
   list_push_front(&(thread_current()->files), &(cur_file_info->elem));
 
   lock_release(&filesys_lock);
@@ -149,18 +164,43 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
 
 static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {
   int fd = args[1];
-  ASSERT(intr_get_level() == INTR_OFF);
   struct file_info_t *file = get_file_info_t(fd);
   f->eax = file_length(file->file_data);
 }
 
 static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args[2], sizeof(void))) {
+  // retrieving fd
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  int fd = *((int *)cur_arg);
+  // retrieving buff pointer
+  cur_arg += sizeof(int);
+  void *buff = *(void **)cur_arg;
+
+  // retrieving size
+  cur_arg += sizeof(void *);
+  off_t sz = *(off_t *)cur_arg;
+
+  // check pointer
+  if (!valid_ptr(buff, sz)) {
+    thread_exit();
+    NOT_REACHED();
+  }
+  if (fd == 0) {
+    // TODO: კლავიატურიდან წაკითხვა
+    return;
+  }
+
+  struct file_info_t *file = get_file_info_t(fd);
+
+  if (file == NULL) {
     thread_exit();
     NOT_REACHED();
   }
 
-  // Your code here
+  lock_acquire(&filesys_lock);
+  f->eax = file_read(file->file_data, buff, sz);
+  lock_release(&filesys_lock);
 }
 
 static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -182,6 +222,13 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
     NOT_REACHED();
   }
 
+  if (fd == 1) {
+    putbuf(buff, sz);
+    /* printf("\n%p\n", buff); */
+    f->eax = sz;
+    return;
+  }
+
   struct file_info_t *file = get_file_info_t(fd);
 
   if (file == NULL) {
@@ -194,11 +241,55 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
   lock_release(&filesys_lock);
 }
 
-static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {
+  // retrieving fd
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  int fd = *((int *)cur_arg);
+  // retrieving size
+  cur_arg += sizeof(int);
+  off_t pos = *(off_t *)cur_arg;
 
-static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {}
+  struct file_info_t *file = get_file_info_t(fd);
+  if (file == NULL) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
-static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {}
+  lock_acquire(&filesys_lock);
+  file_seek(file->file_data, pos);
+  lock_release(&filesys_lock);
+}
+
+static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {
+  // retrieving fd
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  int fd = *((int *)cur_arg);
+  struct file_info_t *file = get_file_info_t(fd);
+  if (file == NULL) {
+    thread_exit();
+    NOT_REACHED();
+  }
+  lock_acquire(&filesys_lock);
+  f->eax = file_tell(file->file_data);
+  lock_release(&filesys_lock);
+}
+
+static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {
+  // retrieving fd
+  char *cur_arg = args;
+  cur_arg += sizeof(void *);
+  int fd = *((int *)cur_arg);
+  struct file_info_t *file = get_file_info_t(fd);
+  if (file == NULL) {
+    thread_exit();
+    NOT_REACHED();
+  }
+  lock_acquire(&filesys_lock);
+  file_close(file->file_data);
+  lock_release(&filesys_lock);
+}
 
 static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = args[1] + 1;
