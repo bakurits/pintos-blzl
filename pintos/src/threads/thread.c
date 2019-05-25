@@ -221,7 +221,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   child_info_t->status = -1;
   sema_init(&child_info_t->sema, 0);
   list_push_back(&thread_current()->children, &child_info_t->elem);
-  list_init (&(t->files));
+  list_init(&(t->files));
 
 #endif
 
@@ -532,9 +532,9 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 
 #ifdef USERPROG
   t->parent_thread = NULL;
-  list_init (&(t->children));
+  list_init(&(t->children));
 #endif
-  list_init (&(t->files));
+  list_init(&(t->files));
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
@@ -733,8 +733,10 @@ struct child_info_t *get_child_info_t(struct thread *t) {
   struct list_elem *e;
   for (e = list_begin(&parent->children); e != list_end(&parent->children);
        e = list_next(e)) {
-    struct child_info_t *child = list_entry(e, struct child_info_t, elem);
-    return child;
+    struct child_info *child = list_entry(e, struct child_info, elem);
+    if (child->child_thread == t) {
+      return child;
+    }
   }
   return NULL;
 }
