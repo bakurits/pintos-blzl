@@ -10,6 +10,8 @@
 #include "threads/interrupt.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 #include "userprog/process.h"
 
 static struct lock filesys_lock;
@@ -50,6 +52,16 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
   syscall_func_arr[args[0]](f, args);
 }
 
+static bool valid_ptr(void *ptr, int size) {
+  if (ptr == NULL) return false;
+
+  ptr += size - 1;
+  if (!is_user_vaddr(ptr)) return false;
+  if (pagedir_get_page(thread_current()->pagedir, ptr) == NULL) return false;
+
+  return true;
+}
+
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
   shutdown_power_off();
 }
@@ -65,6 +77,11 @@ static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
+
   lock_acquire(&filesys_lock);
   tid_t process_pid = process_execute((char *)args[1]);
   f->eax = process_pid;
@@ -80,11 +97,30 @@ static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = process_wait(pid);
 }
 
-static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
-static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {}
+  // Your code here
+}
+
+static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
+
+  // Your code here
+}
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[1], sizeof(char))) {
+    thread_exit();
+    NOT_REACHED();
+  }
+
   lock_acquire(&filesys_lock);
   char *file_name = (char *)args[1];
   struct list *process_files = &(thread_current()->files);
@@ -121,9 +157,22 @@ static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = file_length(file->file_data);
 }
 
-static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[2], sizeof(void))) {
+    thread_exit();
+    NOT_REACHED();
+  }
 
-static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {}
+  // Your code here
+}
+
+static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr(args[2], args[3])) {
+    thread_exit();
+    NOT_REACHED();
+  }
+  // Your code here
+}
 
 static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {}
 
