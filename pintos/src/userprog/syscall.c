@@ -1,18 +1,23 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "devices/shutdown.h"
+#include "filesys/directory.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "filesys/inode.h"
 #include "process.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/process.h"
-#include "filesys/filesys.h"
 
 static struct lock filesys_lock;
 static void syscall_handler(struct intr_frame *);
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&filesys_lock);
+  lock_init(&filesys_lock);
 }
 
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args);
@@ -50,25 +55,24 @@ static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
-  f->eax = args[1];
   printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
-  thread_exit();
   ASSERT(intr_get_level() == INTR_OFF);
   struct child_info_t *child = get_child_info_t(thread_current());
   if (child != NULL) {
     child->status = args[1];
   }
+  thread_exit();
 }
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
-	lock_acquire (&filesys_lock);
-	tid_t process_pid =  process_execute ((char*)args[1]);
-	f->eax = process_pid;
-	if (process_pid != TID_ERROR) {
-		process_exit ();
-	}
+  lock_acquire(&filesys_lock);
+  tid_t process_pid = process_execute((char *)args[1]);
+  f->eax = process_pid;
+  if (process_pid != TID_ERROR) {
+    process_exit();
+  }
 
-	lock_release (&filesys_lock);
+  lock_release(&filesys_lock);
 }
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -81,35 +85,41 @@ static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {}
 static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {}
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
-	lock_acquire (&filesys_lock);
-	char * file_name = (char *) args[1];
-	struct list * process_files = &(thread_current()->files);
-	int new_fd = 0;
+  lock_acquire(&filesys_lock);
+  char *file_name = (char *)args[1];
+  struct list *process_files = &(thread_current()->files);
+  int new_fd = 0;
 
+  if (list_empty(process_files)) {
+    new_fd = 2;  // non-standard dscriptors start from 2
+  } else {
+    struct file_info_t *front_file_info =
+        list_entry(list_front(process_files), struct file_info_t, elem);
+    new_fd = front_file_info->fd + 1;
+  }
 
-	if (list_empty (process_files)) {
-		new_fd = 2; // non-standard dscriptors start from 2
-	} else {
-		struct file_info_t * front_file_info = list_entry (list_front (process_files), struct file_info_t, elem);
-		int new_fd = front_file_info->fd + 2; 
-	}
+  // Get file struct of given path
+  struct file *cur_file_data = filesys_open(file_name);
 
-	// Get file struct of given path
-	struct file * cur_file_data = filesys_open (file_name);
+  // Fill our struct members
+  struct file_info_t *cur_file_info =
+      (struct file_info_t *)malloc(sizeof(struct file_info_t));
+  cur_file_info->fd = new_fd;
+  cur_file_info->file_data = cur_file_data;
 
-	// Fill our struct members
-	struct file_info_t * cur_file_info = (struct file_info_t *) malloc (sizeof (struct file_info_t));
-	cur_file_info -> fd = new_fd;
-	cur_file_info -> file_data = *cur_file_data;
+  // Add new opened file to list of opened files for this thread
+  ASSERT(intr_get_level() == INTR_OFF);
+  list_push_front(&(thread_current()->files), &(cur_file_info->elem));
 
-	// Add new opened file to list of opened files for this thread
-	list_push_front (&(thread_current()->files), &(cur_file_info -> elem));
-
-
-	lock_release (&filesys_lock);
+  lock_release(&filesys_lock);
 }
 
-static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {}
+static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {
+  int fd = args[1];
+  ASSERT(intr_get_level() == INTR_OFF);
+  struct file_info_t *file = get_file_info_t(fd);
+  f->eax = file_length(file->file_data);
+}
 
 static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {}
 
