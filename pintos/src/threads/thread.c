@@ -216,11 +216,13 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   t->parent_thread = thread_current();
 
   // add child to children list
-  struct child_info *child_info = malloc(sizeof(struct child_info));
-  child_info->child_thread = t;
-  child_info->status = -1;
-  sema_init(&child_info->sema, 0);
-  list_push_back(&thread_current()->children, &child_info->elem);
+  struct child_info_t *child_info_t = malloc(sizeof(struct child_info_t));
+  child_info_t->child_thread = t;
+  child_info_t->status = -1;
+  sema_init(&child_info_t->sema, 0);
+  list_push_back(&thread_current()->children, &child_info_t->elem);
+  list_init (&(t->files));
+
 #endif
 
   tid = t->tid = allocate_tid();
@@ -311,7 +313,7 @@ recursion can cause stack overflow. */
 tid_t thread_tid(void) { return thread_current()->tid; }
 
 void thread_remove_child(struct thread *t) {
-  struct child_info *child = get_child_info(t);
+  struct child_info_t *child = get_child_info_t(t);
   if (child != NULL) {
     list_remove(&child->elem);
     free(child);
@@ -530,8 +532,9 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 
 #ifdef USERPROG
   t->parent_thread = NULL;
-  list_init(&t->children);
+  list_init (&(t->children));
 #endif
+  list_init (&(t->files));
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
@@ -569,7 +572,7 @@ static struct thread *next_thread_to_run(void) {
 static void free_child_list(struct thread *t) {
   while (!list_empty(&t->children)) {
     struct list_elem *e = list_pop_back(&t->children);
-    free(list_entry(e, struct child_info, elem));
+    free(list_entry(e, struct child_info_t, elem));
   }
 }
 
@@ -722,7 +725,7 @@ static tid_t allocate_tid(void) {
   return tid;
 }
 
-struct child_info *get_child_info(struct thread *t) {
+struct child_info_t *get_child_info_t(struct thread *t) {
   if (t->parent_thread == NULL) {
     return NULL;
   }
@@ -730,7 +733,7 @@ struct child_info *get_child_info(struct thread *t) {
   struct list_elem *e;
   for (e = list_begin(&parent->children); e != list_end(&parent->children);
        e = list_next(e)) {
-    struct child_info *child = list_entry(e, struct child_info, elem);
+    struct child_info_t *child = list_entry(e, struct child_info_t, elem);
     return child;
   }
   return NULL;

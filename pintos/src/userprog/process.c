@@ -81,6 +81,7 @@ static void *load_args(void *st_pointer, struct args_data_t *data) {
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *args) {
+
   char *fn_copy;
   tid_t tid;
 
@@ -164,7 +165,7 @@ static void start_process(void *argv) {
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int process_wait(tid_t child_tid UNUSED) {
-  struct child_info *child = get_child_info(thread_current());
+  struct child_info_t *child = get_child_info_t(thread_current());
   if (child == NULL) {
     return -1;
   }
@@ -194,7 +195,7 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
-  struct child_info *child = get_child_info(thread_current());
+  struct child_info_t *child = get_child_info_t(thread_current());
   if (child != NULL) sema_up(&child->sema);
 }
 
