@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
+#include "filesys/file.c"
+
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -25,11 +27,17 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
 
-struct child_info {
+struct child_info_t {
   struct thread *child_thread;
   int status;
   struct semaphore sema;
   struct list_elem elem;
+};
+
+struct file_info_t {
+	int fd;
+	struct list_elem elem;
+	struct file file_data;
 };
 
 /* A kernel thread or user process.
@@ -114,6 +122,7 @@ struct thread {
   struct thread *parent_thread;
   struct list children; /* child threads */
 #endif
+  struct list files;
 
   int nice;
   fixed_point_t recent_cpu;
@@ -173,6 +182,6 @@ void thread_update_prior(void);
 void donate_priority(void);
 
 void thread_remove_child(struct thread *t);
-struct child_info *get_child_info(struct thread *t);
+struct child_info_t *get_child_info_t(struct thread *t);
 
 #endif /* threads/thread.h */
