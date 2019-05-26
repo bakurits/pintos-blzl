@@ -220,14 +220,8 @@ void _exit(int status) {
 pid_t _exec(const char *cmd_line) {
   lock_acquire(&filesys_lock);
   tid_t process_pid = process_execute(cmd_line);
-  if (process_pid != TID_ERROR) {
-    lock_release(&filesys_lock);
-
-    _exit(-1);
-  }
-  pid_t res = process_pid;
   lock_release(&filesys_lock);
-  return res;
+  return process_pid;
 }
 
 int _wait(pid_t pid) {

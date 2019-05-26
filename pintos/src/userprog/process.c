@@ -133,18 +133,18 @@ static void start_process(void *argv) {
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load(file_name, &if_.eip, &if_.esp);
 
-  if_.esp = load_args(if_.esp, args_data);
-
-  /* If load failed, quit. */
-  palloc_free_page(args_data->argv[0]);
   args_data->status = success;
   sema_up(&(args_data->load_status_sem));
-//   int sz = PHYS_BASE - if_.esp;
-//   hex_dump(0, if_.esp, sz, true);
+  //   int sz = PHYS_BASE - if_.esp;
+  //   hex_dump(0, if_.esp, sz, true);
+  /* If load failed, quit. */
   if (!success) {
+    palloc_free_page(args_data->argv[0]);
     thread_exit();
   }
 
+  if_.esp = load_args(if_.esp, args_data);
+  palloc_free_page(args_data->argv[0]);
   /* Start the user process by simulating a return from an
                  interrupt, implemented by intr_exit (in
                  threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -196,6 +196,12 @@ void process_exit(void) {
     pagedir_destroy(pd);
   }
   struct child_info_t *child = get_child_info_t(thread_current());
+  struct file *fl = cur->executable;
+  if (fl != NULL) {
+    file_allow_write(fl);
+    file_close(fl);
+    fl = NULL;
+  }
   if (child != NULL) sema_up(&child->sema);
 }
 
@@ -303,7 +309,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
     printf("load: %s: open failed\n", file_name);
     goto done;
   }
-
+  t->executable = file;
+  file_deny_write(file);
   /* Read and verify executable header. */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr ||
       memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 ||
@@ -373,7 +380,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
 
 done:
   /* We arrive here whether the load is successful or not. */
-  file_close(file);
   return success;
 }
 

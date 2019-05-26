@@ -532,8 +532,10 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 
 #ifdef USERPROG
   t->parent_thread = NULL;
+
   list_init(&(t->children));
 #endif
+  t->executable = NULL;
   list_init(&(t->files));
 
   old_level = intr_disable();

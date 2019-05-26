@@ -120,6 +120,7 @@ struct thread {
   struct thread *parent_thread;
   struct list children; /* child threads */
 #endif
+  struct file *executable;
   struct list files;
 
   int nice;
