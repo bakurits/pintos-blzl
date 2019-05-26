@@ -147,11 +147,6 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
   if (!valid_ptr(args[1], sizeof(char))) {
     _exit(-1);
   }
-
-  if (!valid_ptr(args[1], sizeof(char))) {
-    _exit(-1);
-    NOT_REACHED();
-  }
   char *file_name = (char *)args[1];
   f->eax = _open(file_name);
 }
@@ -323,6 +318,12 @@ int _open(const char *file) {
   lock_acquire(&filesys_lock);
   // Get file struct of given path
   struct file *cur_file_data = filesys_open(file);
+  int res;
+
+	if (cur_file_data == NULL) {
+		res = -1;
+		goto done;
+	}
 
   // Fill our struct members
   struct file_info_t *cur_file_info =
@@ -330,12 +331,13 @@ int _open(const char *file) {
   cur_file_info->fd = new_fd;
   cur_file_info->file_data = cur_file_data;
 
+	res = new_fd;
   // Add new opened file to list of opened files for this thread
   list_push_front(&(thread_current()->files), &(cur_file_info->elem));
-  int res = new_fd;
 
-  lock_release(&filesys_lock);
-  return res;
+	done :
+		lock_release(&filesys_lock);
+		return res;
 }
 
 int _filesize(int fd) {
