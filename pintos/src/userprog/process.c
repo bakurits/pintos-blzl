@@ -64,7 +64,7 @@ static void *load_args(void *st_pointer, struct args_data_t *data) {
 
   for (i = 0; i < (int)argc; i++) {
     *((char **)(st_ptr + i * sizeof(char *))) = argument_values_offset;
-    argument_values_offset += strlen(argv[0]) + 1;
+    argument_values_offset += strlen(argv[i]) + 1;
   }
   st_ptr -= sizeof(char *);
   *((char **)st_ptr) = st_ptr + sizeof(char *);
