@@ -211,24 +211,20 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   /* Initialize thread. */
   init_thread(t, name, priority);
 
-#ifdef USERPROG
   // assign parent to new thread
   t->parent_thread = thread_current();
-
-  // add child to children list
-  struct child_info_t *child_info_t = malloc(sizeof(struct child_info_t));
-  child_info_t->child_thread = t;
-  child_info_t->status = -1;
-  sema_init(&child_info_t->sema, 0);
-  list_push_back(&thread_current()->children, &child_info_t->elem);
-  list_init(&(t->files));
-
-#endif
 
   tid = t->tid = allocate_tid();
   t->nice = thread_current()->nice;
   t->recent_cpu = thread_current()->recent_cpu;
   if (thread_mlfqs) mlfq_priority_update(t, NULL);
+
+  // add child to children list
+  struct child_info_t *child_info_t = malloc(sizeof(struct child_info_t));
+  child_info_t->tid = t->tid;
+  child_info_t->status = -1;
+  sema_init(&child_info_t->sema, 0);
+  list_push_back(&t->parent_thread->children, &child_info_t->elem);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -311,14 +307,6 @@ recursion can cause stack overflow. */
 
 /* Returns the running thread's tid. */
 tid_t thread_tid(void) { return thread_current()->tid; }
-
-void thread_remove_child(struct thread *t) {
-  struct child_info_t *child = get_child_info_t(t);
-  if (child != NULL) {
-    list_remove(&child->elem);
-    free(child);
-  }
-}
 
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
@@ -727,7 +715,7 @@ static tid_t allocate_tid(void) {
   return tid;
 }
 
-struct child_info_t *get_child_info_t(struct thread *t) {
+struct list_elem *get_chldelem_parent(struct thread *t) {
   if (t->parent_thread == NULL) {
     return NULL;
   }
@@ -736,14 +724,14 @@ struct child_info_t *get_child_info_t(struct thread *t) {
   for (e = list_begin(&parent->children); e != list_end(&parent->children);
        e = list_next(e)) {
     struct child_info_t *child = list_entry(e, struct child_info_t, elem);
-    if (child->child_thread == t) {
-      return child;
+    if (child->tid == t->tid) {
+      return e;
     }
   }
   return NULL;
 }
 
-struct child_info_t *get_child(struct thread *t, tid_t tid) {
+struct list_elem *get_child_list_elem(struct thread *t, tid_t tid) {
   if (t == NULL) {
     return NULL;
   }
@@ -751,20 +739,20 @@ struct child_info_t *get_child(struct thread *t, tid_t tid) {
   for (e = list_begin(&t->children); e != list_end(&t->children);
        e = list_next(e)) {
     struct child_info_t *child = list_entry(e, struct child_info_t, elem);
-    if (child->child_thread->tid == tid) {
-      return child;
+    if (child->tid == tid) {
+      return e;
     }
   }
   return NULL;
 }
 
-struct file_info_t *get_file_info_t(int fd) {
+struct list_elem *get_file_list_elem(int fd) {
   struct thread *t = thread_current();
   struct list_elem *e;
   for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e)) {
     struct file_info_t *file = list_entry(e, struct file_info_t, elem);
     if (file->fd == fd) {
-      return file;
+      return e;
     }
   }
   return NULL;

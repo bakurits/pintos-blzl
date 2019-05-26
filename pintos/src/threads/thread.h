@@ -26,7 +26,7 @@ typedef int tid_t;
 #define PRI_MAX 63     /* Highest priority. */
 
 struct child_info_t {
-  struct thread *child_thread;
+  tid_t tid;
   int status;
   struct semaphore sema;
   struct list_elem elem;
@@ -181,8 +181,8 @@ void thread_update_prior(void);
 void donate_priority(void);
 
 void thread_remove_child(struct thread *t);
-struct child_info_t *get_child_info_t(struct thread *t);
-struct child_info_t *get_child(struct thread *t, tid_t tid);
-struct file_info_t *get_file_info_t(int fd);
+struct list_elem *get_chldelem_parent(struct thread *t);
+struct list_elem *get_child_list_elem(struct thread *t, tid_t tid);
+struct list_elem *get_file_list_elem(int fd);
 
 #endif /* threads/thread.h */

@@ -115,6 +115,7 @@ tid_t process_execute(const char *args) {
   if (!data.status) {
     return TID_ERROR;
   }
+
   return tid;
 }
 
@@ -165,13 +166,14 @@ static void start_process(void *argv) {
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int process_wait(tid_t child_tid) {
-  struct child_info_t *child = get_child(thread_current(), child_tid);
-  if (child == NULL) {
+  struct list_elem *e = get_child_list_elem(thread_current(), child_tid);
+  if (e == NULL) {
     return -1;
   }
+  struct child_info_t *child = list_entry(e, struct child_info_t, elem);
   sema_down(&child->sema);
   int res = child->status;
-  thread_remove_child(child->child_thread);
+  list_remove(&child->elem);
   return res;
 }
 
@@ -195,14 +197,18 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
-  struct child_info_t *child = get_child_info_t(thread_current());
+
   struct file *fl = cur->executable;
   if (fl != NULL) {
     file_allow_write(fl);
     file_close(fl);
     fl = NULL;
   }
-  if (child != NULL) sema_up(&child->sema);
+  struct list_elem *e = get_chldelem_parent(thread_current());
+  if (e != NULL) {
+    struct child_info_t *child = list_entry(e, struct child_info_t, elem);
+    sema_up(&child->sema);
+  }
 }
 
 /* Sets up the CPU for running user code in the current

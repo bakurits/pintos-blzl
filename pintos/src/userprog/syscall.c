@@ -270,8 +270,10 @@ void _halt(void) { shutdown_power_off(); }
 
 void _exit(int status) {
   printf("%s: exit(%d)\n", &thread_current()->name, status);
-  struct child_info_t *child = get_child_info_t(thread_current());
-  if (child != NULL) {
+
+  struct list_elem *e = get_chldelem_parent(thread_current());
+  if (e != NULL) {
+    struct child_info_t *child = list_entry(e, struct child_info_t, elem);
     child->status = status;
   }
   thread_exit();
@@ -310,7 +312,7 @@ int _open(const char *file) {
   if (list_empty(process_files)) {
     new_fd = 2;  // non-standard dscriptors start from 2
   } else {
-    struct list_elem *e = list_back(process_files);
+    struct list_elem *e = list_front(process_files);
     struct file_info_t *front_file_info =
         list_entry(e, struct file_info_t, elem);
     new_fd = front_file_info->fd + 1;
@@ -318,12 +320,13 @@ int _open(const char *file) {
   lock_acquire(&filesys_lock);
   // Get file struct of given path
   struct file *cur_file_data = filesys_open(file);
+  lock_release(&filesys_lock);
   int res;
 
-	if (cur_file_data == NULL) {
-		res = -1;
-		goto done;
-	}
+  if (cur_file_data == NULL) {
+    res = -1;
+    goto done;
+  }
 
   // Fill our struct members
   struct file_info_t *cur_file_info =
@@ -331,20 +334,21 @@ int _open(const char *file) {
   cur_file_info->fd = new_fd;
   cur_file_info->file_data = cur_file_data;
 
-	res = new_fd;
+  res = new_fd;
   // Add new opened file to list of opened files for this thread
   list_push_front(&(thread_current()->files), &(cur_file_info->elem));
 
-	done :
-		lock_release(&filesys_lock);
-		return res;
+done:
+
+  return res;
 }
 
 int _filesize(int fd) {
-  struct file_info_t *file = get_file_info_t(fd);
-  if (file == NULL) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
     return -1;
   }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   lock_acquire(&filesys_lock);
   int res = file_length(file->file_data);
   lock_release(&filesys_lock);
@@ -357,11 +361,11 @@ int _read(int fd, void *buffer, unsigned size) {
     return size;
   }
 
-  struct file_info_t *file = get_file_info_t(fd);
-
-  if (file == NULL) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
     return -1;
   }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
   lock_acquire(&filesys_lock);
   int res = file_read(file->file_data, buffer, size);
@@ -376,11 +380,11 @@ int _write(int fd, const void *buffer, unsigned size) {
     return size;
   }
 
-  struct file_info_t *file = get_file_info_t(fd);
-
-  if (file == NULL) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
     return -1;
   }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
   lock_acquire(&filesys_lock);
   int res = file_write(file->file_data, buffer, size);
@@ -389,10 +393,11 @@ int _write(int fd, const void *buffer, unsigned size) {
 }
 
 void _seek(int fd, unsigned position) {
-  struct file_info_t *file = get_file_info_t(fd);
-  if (file == NULL) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
     return;
   }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
   lock_acquire(&filesys_lock);
   file_seek(file->file_data, position);
@@ -400,10 +405,11 @@ void _seek(int fd, unsigned position) {
 }
 
 unsigned _tell(int fd) {
-  struct file_info_t *file = get_file_info_t(fd);
-  if (file == NULL) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
     return -1;
   }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   lock_acquire(&filesys_lock);
   unsigned res = file_tell(file->file_data);
   lock_release(&filesys_lock);
@@ -411,12 +417,15 @@ unsigned _tell(int fd) {
 }
 
 void _close(int fd) {
-  struct file_info_t *file = get_file_info_t(fd);
-  if (file == NULL) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
     return;
-    NOT_REACHED();
   }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+
   lock_acquire(&filesys_lock);
   file_close(file->file_data);
   lock_release(&filesys_lock);
+  list_remove(&file->elem);
+  free(file);
 }
