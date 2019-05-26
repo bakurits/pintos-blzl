@@ -139,8 +139,8 @@ static void start_process(void *argv) {
   palloc_free_page(args_data->argv[0]);
   args_data->status = success;
   sema_up(&(args_data->load_status_sem));
-  /* int sz = PHYS_BASE - if_.esp;
-  hex_dump(0, if_.esp, sz, true); */
+//   int sz = PHYS_BASE - if_.esp;
+//   hex_dump(0, if_.esp, sz, true);
   if (!success) {
     thread_exit();
   }
