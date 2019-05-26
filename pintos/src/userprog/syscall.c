@@ -41,17 +41,6 @@ static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args);
 
 typedef void (*syscall_func_t)(struct intr_frame *f UNUSED, uint32_t *args);
 
-syscall_func_t syscall_func_arr[14] = {
-    syscall_halt,   syscall_exit,    syscall_exec, syscall_wait,
-    syscall_create, syscall_remove,  syscall_open, syscall_filesize,
-    syscall_read,   syscall_write,   syscall_seek, syscall_tell,
-    syscall_close,  syscall_practice};
-
-static void syscall_handler(struct intr_frame *f UNUSED) {
-  uint32_t *args = ((uint32_t *)f->esp);
-  syscall_func_arr[args[0]](f, args);
-}
-
 static bool valid_ptr(void *ptr, int size) {
   if (ptr == NULL) return false;
 
@@ -62,28 +51,59 @@ static bool valid_ptr(void *ptr, int size) {
   return true;
 }
 
+syscall_func_t syscall_func_arr[14] = {
+    syscall_halt,   syscall_exit,    syscall_exec, syscall_wait,
+    syscall_create, syscall_remove,  syscall_open, syscall_filesize,
+    syscall_read,   syscall_write,   syscall_seek, syscall_tell,
+    syscall_close,  syscall_practice};
+
+static void syscall_handler(struct intr_frame *f UNUSED) {
+  uint32_t *args = ((uint32_t *)f->esp);
+	if (!valid_ptr(args, sizeof (void *))) {
+		_exit (-1);
+	}
+
+  syscall_func_arr[args[0]](f, args);
+}
+
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
   _halt();
 }
 
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
+	if (!valid_ptr(args + 1, sizeof (void *))) {
+		_exit (-1);
+	}
   _exit(*(int *)(&args[1]));
 }
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args[1], sizeof(char))) {
-    _exit(-1);
-    NOT_REACHED();
-  }
+	if (!valid_ptr(args + 1, sizeof (void *))) {
+		_exit (-1);
+	}
+	if (!valid_ptr(args[1], sizeof (char *))) {
+		_exit (-1);
+	}
   f->eax = _exec((char *)args[1]);
 }
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
+	if (!valid_ptr(args + 1, sizeof (pid_t))) {
+		_exit (-1);
+	}
   f->eax = _wait(args[1]);
 }
 
 static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
-  // retrieving file name
+  if (!valid_ptr(args + 1, sizeof (char *) + sizeof (unsigned))) {
+		_exit (-1);
+	}
+
+	if (!valid_ptr(args[1], sizeof (char))) {
+		_exit (-1);
+	}
+	
+	// retrieving file name
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   char *file_name = *((char **)cur_arg);
@@ -100,7 +120,15 @@ static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
-  // retrieving file name
+  if (!valid_ptr(args + 1, sizeof (char *))) {
+		_exit (-1);
+	}
+	if (!valid_ptr(args[1], sizeof (char))) {
+		_exit (-1);
+	}
+
+
+	// retrieving file name
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   char *file_name = *((char **)cur_arg);
@@ -114,7 +142,14 @@ static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args[1], sizeof(char))) {
+  if (!valid_ptr(args + 1, sizeof (char *))) {
+		_exit (-1);
+	}
+	if (!valid_ptr(args[1], sizeof (char))) {
+		_exit (-1);
+	}
+	
+	if (!valid_ptr(args[1], sizeof(char))) {
     _exit(-1);
     NOT_REACHED();
   }
@@ -123,11 +158,22 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {
-  f->eax = _filesize(args[1]);
+  if (!valid_ptr(args + 1, sizeof (char *))) {
+		_exit (-1);
+	}
+	
+	f->eax = _filesize(args[1]);
 }
 
 static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
-  // retrieving fd
+  if (!valid_ptr(args + 1, sizeof (int) + sizeof (char *) + sizeof (unsigned))) {
+		_exit (-1);
+	}
+	if (!valid_ptr(args[2], sizeof (char))) {
+		_exit (-1);
+	}
+	
+	// retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   int fd = *((int *)cur_arg);
@@ -149,7 +195,14 @@ static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
-  //  printf("\n write start\n");
+  if (!valid_ptr(args + 1, sizeof (int) + sizeof (char *) + sizeof (unsigned))) {
+		_exit (-1);
+	}
+	if (!valid_ptr(args[2], sizeof (char))) {
+		_exit (-1);
+	}
+	
+	//  printf("\n write start\n");
   // retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
@@ -174,7 +227,11 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {
-  // retrieving fd
+  if (!valid_ptr(args + 1, sizeof (int) + sizeof (unsigned))) {
+		_exit (-1);
+	}
+
+	// retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   int fd = *((int *)cur_arg);
@@ -185,7 +242,10 @@ static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {
-  // retrieving fd
+  if (!valid_ptr(args + 1, sizeof (int))) {
+		_exit (-1);
+	}
+	// retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   int fd = *((int *)cur_arg);
@@ -193,7 +253,10 @@ static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {
-  // retrieving fd
+  if (!valid_ptr(args + 1, sizeof (int))) {
+		_exit (-1);
+	}
+	// retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   int fd = *((int *)cur_arg);
@@ -201,7 +264,10 @@ static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args) {
-  f->eax = _practice(args[1]);
+  if (!valid_ptr(args + 1, sizeof (int))) {
+		_exit (-1);
+	}
+	f->eax = _practice(args[1]);
 }
 
 int _practice(int i) { return i + 1; }
