@@ -164,8 +164,8 @@ static void start_process(void *argv) {
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int process_wait(tid_t child_tid UNUSED) {
-  struct child_info_t *child = get_child_info_t(thread_current());
+int process_wait(tid_t child_tid) {
+  struct child_info_t *child = get_child(thread_current(), child_tid);
   if (child == NULL) {
     return -1;
   }

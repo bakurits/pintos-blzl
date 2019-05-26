@@ -743,6 +743,21 @@ struct child_info_t *get_child_info_t(struct thread *t) {
   return NULL;
 }
 
+struct child_info_t *get_child(struct thread *t, tid_t tid) {
+  if (t == NULL) {
+    return NULL;
+  }
+  struct list_elem *e;
+  for (e = list_begin(&t->children); e != list_end(&t->children);
+       e = list_next(e)) {
+    struct child_info_t *child = list_entry(e, struct child_info_t, elem);
+    if (child->child_thread->tid == tid) {
+      return child;
+    }
+  }
+  return NULL;
+}
+
 struct file_info_t *get_file_info_t(int fd) {
   struct thread *t = thread_current();
   struct list_elem *e;

@@ -182,6 +182,7 @@ void donate_priority(void);
 
 void thread_remove_child(struct thread *t);
 struct child_info_t *get_child_info_t(struct thread *t);
+struct child_info_t *get_child(struct thread *t, tid_t tid);
 struct file_info_t *get_file_info_t(int fd);
 
 #endif /* threads/thread.h */
