@@ -88,9 +88,10 @@ static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
   tid_t process_pid = process_execute((char *)args[1]);
   f->eax = process_pid;
   if (process_pid != TID_ERROR) {
+	lock_release(&filesys_lock);
+
     process_exit();
   }
-
   lock_release(&filesys_lock);
 }
 
@@ -162,6 +163,7 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
 
   // Add new opened file to list of opened files for this thread
   list_push_front(&(thread_current()->files), &(cur_file_info->elem));
+  f->eax = new_fd;
 
   lock_release(&filesys_lock);
 }
