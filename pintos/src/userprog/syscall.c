@@ -357,8 +357,11 @@ int _filesize(int fd) {
 
 int _read(int fd, void *buffer, unsigned size) {
   if (fd == 0) {
-    // TODO: კლავიატურიდან წაკითხვა
-    return size;
+		char * charbuff = (char *) buffer;
+		int i = 0;
+		for (i = 0; i < size; i ++) {
+			charbuff[i] = input_getc ();
+		}
   }
 
   struct list_elem *e = get_file_list_elem(fd);
