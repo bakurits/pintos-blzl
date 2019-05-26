@@ -7,6 +7,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "list.h"
 #include "process.h"
 #include "threads/interrupt.h"
 #include "threads/malloc.h"
@@ -61,17 +62,8 @@ static bool valid_ptr(void *ptr, int size) {
   return true;
 }
 
-static void _exit(int status) {
-  printf("%s: exit(%d)\n", &thread_current()->name, status);
-  struct child_info_t *child = get_child_info_t(thread_current());
-  if (child != NULL) {
-    child->status = status;
-  }
-  thread_exit();
-}
-
 static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
-  shutdown_power_off();
+  _halt();
 }
 
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -83,21 +75,11 @@ static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
     _exit(-1);
     NOT_REACHED();
   }
-
-  lock_acquire(&filesys_lock);
-  tid_t process_pid = process_execute((char *)args[1]);
-  f->eax = process_pid;
-  if (process_pid != TID_ERROR) {
-	lock_release(&filesys_lock);
-
-    process_exit();
-  }
-  lock_release(&filesys_lock);
+  f->eax = _exec((char *)args[1]);
 }
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
-  tid_t pid = args[1];
-  f->eax = process_wait(pid);
+  f->eax = _wait(args[1]);
 }
 
 static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -113,9 +95,8 @@ static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
     _exit(-1);
     NOT_REACHED();
   }
-  lock_acquire(&filesys_lock);
-  f->eax = filesys_create(file_name, sz);
-  lock_release(&filesys_lock);
+
+  f->eax = _create(file_name, sz);
 }
 
 static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -128,9 +109,8 @@ static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
     _exit(-1);
     NOT_REACHED();
   }
-  lock_acquire(&filesys_lock);
-  f->eax = filesys_remove(file_name);
-  lock_release(&filesys_lock);
+
+  f->eax = _remove(file_name);
 }
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -138,40 +118,12 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
     _exit(-1);
     NOT_REACHED();
   }
-
-  lock_acquire(&filesys_lock);
   char *file_name = (char *)args[1];
-  struct list *process_files = &(thread_current()->files);
-  int new_fd = 0;
-
-  if (list_empty(process_files)) {
-    new_fd = 2;  // non-standard dscriptors start from 2
-  } else {
-    struct file_info_t *front_file_info =
-        list_entry(list_front(process_files), struct file_info_t, elem);
-    new_fd = front_file_info->fd + 1;
-  }
-
-  // Get file struct of given path
-  struct file *cur_file_data = filesys_open(file_name);
-
-  // Fill our struct members
-  struct file_info_t *cur_file_info =
-      (struct file_info_t *)malloc(sizeof(struct file_info_t));
-  cur_file_info->fd = new_fd;
-  cur_file_info->file_data = cur_file_data;
-
-  // Add new opened file to list of opened files for this thread
-  list_push_front(&(thread_current()->files), &(cur_file_info->elem));
-  f->eax = new_fd;
-
-  lock_release(&filesys_lock);
+  f->eax = _open(file_name);
 }
 
 static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {
-  int fd = args[1];
-  struct file_info_t *file = get_file_info_t(fd);
-  f->eax = file_length(file->file_data);
+  f->eax = _filesize(args[1]);
 }
 
 static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -192,26 +144,12 @@ static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
     _exit(-1);
     NOT_REACHED();
   }
-  if (fd == 0) {
-    // TODO: კლავიატურიდან წაკითხვა
-    return;
-  }
 
-  struct file_info_t *file = get_file_info_t(fd);
-
-  if (file == NULL) {
-    _exit(-1);
-    NOT_REACHED();
-  }
-
-  lock_acquire(&filesys_lock);
-  f->eax = file_read(file->file_data, buff, sz);
-  lock_release(&filesys_lock);
+  f->eax = _read(fd, buff, sz);
 }
 
 static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
-
-    //  printf("\n write start\n"); 
+  //  printf("\n write start\n");
   // retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
@@ -224,7 +162,7 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
   cur_arg += sizeof(void *);
   off_t sz = *(off_t *)cur_arg;
 
-//   printf ("ppp: %p %d\n", buff, sz);
+  //   printf ("ppp: %p %d\n", buff, sz);
 
   // check pointer
   if (!valid_ptr(buff, sz)) {
@@ -232,23 +170,7 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
     NOT_REACHED();
   }
 
-  if (fd == 1) {
-    putbuf(buff, sz);
-    //  printf("\n write :   %s\n", buff); 
-    f->eax = sz;
-    return;
-  }
-
-  struct file_info_t *file = get_file_info_t(fd);
-
-  if (file == NULL) {
-    _exit(-1);
-    NOT_REACHED();
-  }
-
-  lock_acquire(&filesys_lock);
-  f->eax = file_write(file->file_data, buff, sz);
-  lock_release(&filesys_lock);
+  f->eax = _write(fd, buff, sz);
 }
 
 static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -259,16 +181,7 @@ static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {
   // retrieving size
   cur_arg += sizeof(int);
   off_t pos = *(off_t *)cur_arg;
-
-  struct file_info_t *file = get_file_info_t(fd);
-  if (file == NULL) {
-    _exit(-1);
-    NOT_REACHED();
-  }
-
-  lock_acquire(&filesys_lock);
-  file_seek(file->file_data, pos);
-  lock_release(&filesys_lock);
+  _seek(fd, pos);
 }
 
 static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -276,14 +189,7 @@ static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   int fd = *((int *)cur_arg);
-  struct file_info_t *file = get_file_info_t(fd);
-  if (file == NULL) {
-    _exit(-1);
-    NOT_REACHED();
-  }
-  lock_acquire(&filesys_lock);
-  f->eax = file_tell(file->file_data);
-  lock_release(&filesys_lock);
+  f->eax = _tell(fd);
 }
 
 static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {
@@ -291,16 +197,165 @@ static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {
   char *cur_arg = args;
   cur_arg += sizeof(void *);
   int fd = *((int *)cur_arg);
+  _close(fd);
+}
+
+static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args) {
+  f->eax = _practice(args[1]);
+}
+
+int _practice(int i) { return i + 1; }
+
+void _halt(void) { shutdown_power_off(); }
+
+void _exit(int status) {
+  printf("%s: exit(%d)\n", &thread_current()->name, status);
+  struct child_info_t *child = get_child_info_t(thread_current());
+  if (child != NULL) {
+    child->status = status;
+  }
+  thread_exit();
+}
+
+pid_t _exec(const char *cmd_line) {
+  lock_acquire(&filesys_lock);
+  tid_t process_pid = process_execute(cmd_line);
+  if (process_pid != TID_ERROR) {
+    lock_release(&filesys_lock);
+
+    _exit(-1);
+  }
+  pid_t res = process_pid;
+  lock_release(&filesys_lock);
+  return res;
+}
+
+int _wait(pid_t pid) {
+  tid_t tid = pid;
+  return process_wait(tid);
+}
+
+bool _create(const char *file, unsigned initial_size) {
+  lock_acquire(&filesys_lock);
+  bool res = filesys_create(file, initial_size);
+  lock_release(&filesys_lock);
+  return res;
+}
+
+bool _remove(const char *file) {
+  lock_acquire(&filesys_lock);
+  bool res = filesys_remove(file);
+  lock_release(&filesys_lock);
+  return res;
+}
+
+int _open(const char *file) {
+  struct list *process_files = &(thread_current()->files);
+  int new_fd = 0;
+
+  if (list_empty(process_files)) {
+    new_fd = 2;  // non-standard dscriptors start from 2
+  } else {
+    struct list_elem *e = list_back(process_files);
+    struct file_info_t *front_file_info =
+        list_entry(e, struct file_info_t, elem);
+    new_fd = front_file_info->fd + 1;
+  }
+  lock_acquire(&filesys_lock);
+  // Get file struct of given path
+  struct file *cur_file_data = filesys_open(file);
+
+  // Fill our struct members
+  struct file_info_t *cur_file_info =
+      (struct file_info_t *)malloc(sizeof(struct file_info_t));
+  cur_file_info->fd = new_fd;
+  cur_file_info->file_data = cur_file_data;
+
+  // Add new opened file to list of opened files for this thread
+  list_push_front(&(thread_current()->files), &(cur_file_info->elem));
+  int res = new_fd;
+
+  lock_release(&filesys_lock);
+  return res;
+}
+
+int _filesize(int fd) {
   struct file_info_t *file = get_file_info_t(fd);
   if (file == NULL) {
-    _exit(-1);
+    return -1;
+  }
+  lock_acquire(&filesys_lock);
+  int res = file_length(file->file_data);
+  lock_release(&filesys_lock);
+  return res;
+}
+
+int _read(int fd, void *buffer, unsigned size) {
+  if (fd == 0) {
+    // TODO: კლავიატურიდან წაკითხვა
+    return size;
+  }
+
+  struct file_info_t *file = get_file_info_t(fd);
+
+  if (file == NULL) {
+    return -1;
+  }
+
+  lock_acquire(&filesys_lock);
+  int res = file_read(file->file_data, buffer, size);
+  lock_release(&filesys_lock);
+  return res;
+}
+
+int _write(int fd, const void *buffer, unsigned size) {
+  if (fd == 1) {
+    putbuf(buffer, size);
+    //  printf("\n write :   %s\n", buff);
+    return size;
+  }
+
+  struct file_info_t *file = get_file_info_t(fd);
+
+  if (file == NULL) {
+    return -1;
+  }
+
+  lock_acquire(&filesys_lock);
+  int res = file_write(file->file_data, buffer, size);
+  lock_release(&filesys_lock);
+  return res;
+}
+
+void _seek(int fd, unsigned position) {
+  struct file_info_t *file = get_file_info_t(fd);
+  if (file == NULL) {
+    return;
+  }
+
+  lock_acquire(&filesys_lock);
+  file_seek(file->file_data, position);
+  lock_release(&filesys_lock);
+}
+
+unsigned _tell(int fd) {
+  struct file_info_t *file = get_file_info_t(fd);
+  if (file == NULL) {
+    return -1;
+  }
+  lock_acquire(&filesys_lock);
+  unsigned res = file_tell(file->file_data);
+  lock_release(&filesys_lock);
+  return res;
+}
+
+void _close(int fd) {
+  struct file_info_t *file = get_file_info_t(fd);
+  if (file == NULL) {
+    return;
     NOT_REACHED();
   }
   lock_acquire(&filesys_lock);
   file_close(file->file_data);
   lock_release(&filesys_lock);
-}
-
-static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args) {
-  f->eax = args[1] + 1;
 }
