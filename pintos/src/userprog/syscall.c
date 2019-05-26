@@ -66,7 +66,12 @@ static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
+	// ASSERT (1==2);
   printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
+	// char buff[20] = "exit";
+	// snprintf (buff, 15, "exit(%d)\n", args[1]);
+	// PANIC ("PANIC %s", buff);
+	// putbuf(buff, strlen (buff));
   struct child_info_t *child = get_child_info_t(thread_current());
   if (child != NULL) {
     child->status = args[1];
@@ -204,6 +209,8 @@ static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
+
+    //  printf("\n write start\n"); 
   // retrieving fd
   char *cur_arg = args;
   cur_arg += sizeof(void *);
@@ -216,15 +223,17 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
   cur_arg += sizeof(void *);
   off_t sz = *(off_t *)cur_arg;
 
+//   printf ("ppp: %p %d\n", buff, sz);
+
   // check pointer
-  if (!valid_ptr(buff, sz)) {
-    thread_exit();
-    NOT_REACHED();
-  }
+//   if (!valid_ptr(buff, sz)) {
+//     thread_exit();
+//     NOT_REACHED();
+//   }
 
   if (fd == 1) {
     putbuf(buff, sz);
-    /* printf("\n%p\n", buff); */
+    //  printf("\n write :   %s\n", buff); 
     f->eax = sz;
     return;
   }

@@ -64,7 +64,8 @@ static void *load_args(void *st_pointer, struct args_data_t *data) {
 
   for (i = 0; i < (int)argc; i++) {
     *((char **)(st_ptr + i * sizeof(char *))) = argument_values_offset;
-    argument_values_offset += strlen(argv[0]) + 1;
+	//printf ("sdsds: %p\n", argument_values_offset);
+    argument_values_offset += strlen(argv[i]) + 1;
   }
   st_ptr -= sizeof(char *);
   *((char **)st_ptr) = st_ptr + sizeof(char *);
@@ -139,8 +140,8 @@ static void start_process(void *argv) {
   palloc_free_page(args_data->argv[0]);
   args_data->status = success;
   sema_up(&(args_data->load_status_sem));
-  /* int sz = PHYS_BASE - if_.esp;
-  hex_dump(0, if_.esp, sz, true); */
+//   int sz = PHYS_BASE - if_.esp;
+//   hex_dump(0, if_.esp, sz, true);
   if (!success) {
     thread_exit();
   }
