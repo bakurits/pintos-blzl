@@ -306,7 +306,8 @@ bool _remove(const char *file) {
 }
 
 int _open(const char *file) {
-  struct list *process_files = &(thread_current()->files);
+  lock_acquire(&(thread_current()->files.lock));
+  struct list *process_files = &(thread_current()->files.list);
   int new_fd = 0;
 
   if (list_empty(process_files)) {
@@ -317,6 +318,7 @@ int _open(const char *file) {
         list_entry(e, struct file_info_t, elem);
     new_fd = front_file_info->fd + 1;
   }
+  lock_release(&(thread_current()->files.lock));
   lock_acquire(&filesys_lock);
   // Get file struct of given path
   struct file *cur_file_data = filesys_open(file);
@@ -336,7 +338,9 @@ int _open(const char *file) {
 
   res = new_fd;
   // Add new opened file to list of opened files for this thread
-  list_push_front(&(thread_current()->files), &(cur_file_info->elem));
+  lock_acquire(&(thread_current()->files.lock));
+  list_push_front(&(thread_current()->files.list), &(cur_file_info->elem));
+  lock_release(&(thread_current()->files.lock));
 
 done:
 
@@ -357,16 +361,16 @@ int _filesize(int fd) {
 
 int _read(int fd, void *buffer, unsigned size) {
   if (fd == 0) {
-		char * charbuff = (char *) buffer;
-		int i = 0;
-		for (i = 0; i < size; i ++) {
-			charbuff[i] = input_getc ();
-		}
+    char *charbuff = (char *)buffer;
+    int i = 0;
+    for (i = 0; i < size; i++) {
+      charbuff[i] = input_getc();
+    }
   }
 
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
-    return -1;
+    _exit(-1);
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
@@ -385,7 +389,7 @@ int _write(int fd, const void *buffer, unsigned size) {
 
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
-    return -1;
+    _exit(-1);
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
@@ -410,7 +414,7 @@ void _seek(int fd, unsigned position) {
 unsigned _tell(int fd) {
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
-    return -1;
+    _exit(-1);
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   lock_acquire(&filesys_lock);
@@ -429,6 +433,8 @@ void _close(int fd) {
   lock_acquire(&filesys_lock);
   file_close(file->file_data);
   lock_release(&filesys_lock);
+  lock_acquire(&thread_current()->files.lock);
   list_remove(&file->elem);
+  lock_release(&thread_current()->files.lock);
   free(file);
 }

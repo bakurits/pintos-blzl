@@ -38,6 +38,11 @@ struct file_info_t {
   struct file *file_data;
 };
 
+struct syn_list_t {
+  struct lock lock;
+  struct list list;
+};
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -118,10 +123,11 @@ struct thread {
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
   struct thread *parent_thread;
-  struct list children; /* child threads */
+
 #endif
   struct file *executable;
-  struct list files;
+  struct syn_list_t children; /* child threads */
+  struct syn_list_t files;
 
   int nice;
   fixed_point_t recent_cpu;

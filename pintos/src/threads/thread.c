@@ -169,6 +169,8 @@ void thread_tick(void) {
   else
     kernel_ticks++;
 
+  awake_threads(timer_ticks());
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE) intr_yield_on_return();
 }
@@ -220,12 +222,14 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   if (thread_mlfqs) mlfq_priority_update(t, NULL);
 
   // add child to children list
-  struct child_info_t *child_info_t = malloc(sizeof(struct child_info_t));
-  child_info_t->tid = t->tid;
-  child_info_t->status = -1;
-  sema_init(&child_info_t->sema, 0);
-  list_push_back(&t->parent_thread->children, &child_info_t->elem);
-
+  struct child_info_t *child = malloc(sizeof(struct child_info_t));
+  if (child == NULL) return TID_ERROR;
+  child->tid = t->tid;
+  child->status = -1;
+  sema_init(&child->sema, 0);
+  lock_acquire(&t->parent_thread->children.lock);
+  list_push_back(&t->parent_thread->children.list, &child->elem);
+  lock_release(&t->parent_thread->children.lock);
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
   kf->eip = NULL;
@@ -334,7 +338,9 @@ when it calls thread_schedule_tail(). */
 void thread_yield(void) {
   struct thread *cur = thread_current();
   enum intr_level old_level;
-
+  if (intr_context()) {
+    PANIC("%s %d", cur->name, cur->tid);
+  }
   ASSERT(!intr_context());
 
   old_level = intr_disable();
@@ -521,11 +527,13 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 #ifdef USERPROG
   t->parent_thread = NULL;
 
-  list_init(&(t->children));
 #endif
-  t->executable = NULL;
-  list_init(&(t->files));
+  list_init(&(t->children.list));
+  lock_init(&(t->children.lock));
+  list_init(&(t->files.list));
+  lock_init(&(t->files.lock));
 
+  t->executable = NULL;
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
@@ -560,10 +568,12 @@ static struct thread *next_thread_to_run(void) {
 }
 
 static void free_child_list(struct thread *t) {
-  while (!list_empty(&t->children)) {
-    struct list_elem *e = list_pop_back(&t->children);
+  lock_acquire(&t->children.lock);
+  while (!list_empty(&t->children.list)) {
+    struct list_elem *e = list_pop_back(&t->children.list);
     free(list_entry(e, struct child_info_t, elem));
   }
+  lock_release(&t->children.lock);
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -720,14 +730,17 @@ struct list_elem *get_chldelem_parent(struct thread *t) {
     return NULL;
   }
   struct thread *parent = t->parent_thread;
+  lock_acquire(&parent->children.lock);
   struct list_elem *e;
-  for (e = list_begin(&parent->children); e != list_end(&parent->children);
-       e = list_next(e)) {
+  for (e = list_begin(&parent->children.list);
+       e != list_end(&parent->children.list); e = list_next(e)) {
     struct child_info_t *child = list_entry(e, struct child_info_t, elem);
     if (child->tid == t->tid) {
+      lock_release(&parent->children.lock);
       return e;
     }
   }
+  lock_release(&parent->children.lock);
   return NULL;
 }
 
@@ -736,25 +749,32 @@ struct list_elem *get_child_list_elem(struct thread *t, tid_t tid) {
     return NULL;
   }
   struct list_elem *e;
-  for (e = list_begin(&t->children); e != list_end(&t->children);
+  lock_acquire(&t->children.lock);
+  for (e = list_begin(&t->children.list); e != list_end(&t->children.list);
        e = list_next(e)) {
     struct child_info_t *child = list_entry(e, struct child_info_t, elem);
     if (child->tid == tid) {
+      lock_release(&t->children.lock);
       return e;
     }
   }
+  lock_release(&t->children.lock);
   return NULL;
 }
 
 struct list_elem *get_file_list_elem(int fd) {
   struct thread *t = thread_current();
   struct list_elem *e;
-  for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e)) {
+  lock_acquire(&t->files.lock);
+  for (e = list_begin(&t->files.list); e != list_end(&t->files.list);
+       e = list_next(e)) {
     struct file_info_t *file = list_entry(e, struct file_info_t, elem);
     if (file->fd == fd) {
+      lock_release(&t->files.lock);
       return e;
     }
   }
+  lock_release(&t->files.lock);
   return NULL;
 }
 
