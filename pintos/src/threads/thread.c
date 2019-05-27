@@ -573,6 +573,17 @@ static void free_child_list(struct thread *t) {
   lock_release(&t->children.lock);
 }
 
+static void free_file_list(struct thread *t) {
+  lock_acquire(&t->files.lock);
+  while (!list_empty(&t->files.list)) {
+    struct list_elem *e = list_pop_back(&t->files.list);
+    struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+    file_close(file->file_data);
+    free(file);
+  }
+  lock_release(&t->files.lock);
+}
+
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
 
@@ -614,9 +625,11 @@ palloc().) */
     ASSERT(prev != cur);
 
 #ifdef USERPROG
-    free_child_list(prev);
+
     // TODO: remove from parent->children list & free
 #endif
+    free_child_list(prev);
+    free_file_list(prev);
     palloc_free_page(prev);
   }
 }
