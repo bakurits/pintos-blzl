@@ -2,6 +2,7 @@
 #include <console.h>
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "devices/input.h"
 #include "devices/shutdown.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
@@ -20,11 +21,11 @@ static struct lock filesys_lock;
 static void syscall_handler(struct intr_frame *);
 
 void syscall_init(void) {
-  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
   lock_init(&filesys_lock);
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args);
+static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args UNUSED);
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args);
@@ -66,85 +67,62 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
   syscall_func_arr[args[0]](f, args);
 }
 
-static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args) {
+static void syscall_halt(struct intr_frame *f UNUSED, uint32_t *args UNUSED) {
   _halt();
 }
 
 static void syscall_exit(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(void *))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(void *))) {
     _exit(-1);
   }
   _exit(*(int *)(&args[1]));
 }
 
 static void syscall_exec(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(void *))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(void *))) {
     _exit(-1);
   }
-  if (!valid_ptr(args[1], sizeof(char *))) {
+  if (!valid_ptr((void *)args[1], sizeof(char))) {
     _exit(-1);
   }
   f->eax = _exec((char *)args[1]);
 }
 
 static void syscall_wait(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(pid_t))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(pid_t))) {
     _exit(-1);
   }
   f->eax = _wait(args[1]);
 }
 
 static void syscall_create(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(char *) + sizeof(unsigned))) {
+  if (!valid_ptr((void *)(args + 1), 2 * sizeof(char *) + sizeof(unsigned))) {
     _exit(-1);
   }
 
-  if (!valid_ptr(args[1], sizeof(char))) {
+  if (!valid_ptr((void *)args[1], sizeof(char))) {
     _exit(-1);
   }
 
-  // retrieving file name
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  char *file_name = *((char **)cur_arg);
-  // retrieving size
-  cur_arg += sizeof(char *);
-  off_t sz = *(off_t *)cur_arg;
-  // check pointer
-  if (!valid_ptr(file_name, sizeof(char))) {
-    _exit(-1);
-    NOT_REACHED();
-  }
-
-  f->eax = _create(file_name, sz);
+  f->eax = _create((char *)args[1], (unsigned)args[2]);
 }
 
 static void syscall_remove(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(char *))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(char *))) {
     _exit(-1);
   }
-  if (!valid_ptr(args[1], sizeof(char))) {
+  if (!valid_ptr((void *)args[1], sizeof(char))) {
     _exit(-1);
   }
 
-  // retrieving file name
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  char *file_name = *((char **)cur_arg);
-  // check pointer
-  if (!valid_ptr(file_name, sizeof(char))) {
-    _exit(-1);
-    NOT_REACHED();
-  }
-
-  f->eax = _remove(file_name);
+  f->eax = _remove((char *)args[1]);
 }
 
 static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(char *))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(char *))) {
     _exit(-1);
   }
-  if (!valid_ptr(args[1], sizeof(char))) {
+  if (!valid_ptr((void *)args[1], sizeof(char))) {
     _exit(-1);
   }
   char *file_name = (char *)args[1];
@@ -152,35 +130,27 @@ static void syscall_open(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_filesize(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(char *))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(char *))) {
     _exit(-1);
   }
 
-  f->eax = _filesize(args[1]);
+  f->eax = _filesize((int)args[1]);
 }
 
 static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(int) + sizeof(char *) + sizeof(unsigned))) {
+  if (!valid_ptr((void *)(args + 1),
+                 sizeof(int) + sizeof(char *) + sizeof(unsigned))) {
     _exit(-1);
   }
-  if (!valid_ptr(args[2], sizeof(char))) {
+  if (!valid_ptr((void *)args[2], sizeof(char))) {
     _exit(-1);
   }
-
-  // retrieving fd
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  int fd = *((int *)cur_arg);
-  // retrieving buff pointer
-  cur_arg += sizeof(int);
-  void *buff = *(void **)cur_arg;
-
-  // retrieving size
-  cur_arg += sizeof(void *);
-  off_t sz = *(off_t *)cur_arg;
+  int fd = (int)args[1];
+  void *buff = (void *)args[2];
+  unsigned sz = (int)args[3];
 
   // check pointer
-  if (!valid_ptr(buff, sz)) {
+  if (!valid_ptr(buff, (int)sz)) {
     _exit(-1);
     NOT_REACHED();
   }
@@ -189,30 +159,19 @@ static void syscall_read(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(int) + sizeof(char *) + sizeof(unsigned))) {
+  if (!valid_ptr((void *)(args + 1),
+                 sizeof(int) + sizeof(char *) + sizeof(unsigned))) {
     _exit(-1);
   }
-  if (!valid_ptr(args[2], sizeof(char))) {
+  if (!valid_ptr((void *)args[2], sizeof(char))) {
     _exit(-1);
   }
-
-  //  printf("\n write start\n");
-  // retrieving fd
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  int fd = *((int *)cur_arg);
-  // retrieving buff pointer
-  cur_arg += sizeof(int);
-  void *buff = *(void **)cur_arg;
-
-  // retrieving size
-  cur_arg += sizeof(void *);
-  off_t sz = *(off_t *)cur_arg;
-
-  //   printf ("ppp: %p %d\n", buff, sz);
+  int fd = (int)args[1];
+  void *buff = (void *)args[2];
+  unsigned sz = (int)args[3];
 
   // check pointer
-  if (!valid_ptr(buff, sz)) {
+  if (!valid_ptr(buff, (int)sz)) {
     _exit(-1);
     NOT_REACHED();
   }
@@ -221,47 +180,37 @@ static void syscall_write(struct intr_frame *f UNUSED, uint32_t *args) {
 }
 
 static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(int) + sizeof(unsigned))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int) + sizeof(unsigned))) {
     _exit(-1);
   }
 
-  // retrieving fd
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  int fd = *((int *)cur_arg);
-  // retrieving size
-  cur_arg += sizeof(int);
-  off_t pos = *(off_t *)cur_arg;
+  int fd = (int)args[1];
+  unsigned pos = (unsigned)args[2];
+
   _seek(fd, pos);
 }
 
 static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(int))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int))) {
     _exit(-1);
-  }
-  // retrieving fd
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  int fd = *((int *)cur_arg);
+  };
+  int fd = (int)args[1];
   f->eax = _tell(fd);
 }
 
 static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(int))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int))) {
     _exit(-1);
   }
-  // retrieving fd
-  char *cur_arg = args;
-  cur_arg += sizeof(void *);
-  int fd = *((int *)cur_arg);
+  int fd = (int)args[1];
   _close(fd);
 }
 
 static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr(args + 1, sizeof(int))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int))) {
     _exit(-1);
   }
-  f->eax = _practice(args[1]);
+  f->eax = _practice((int)args[1]);
 }
 
 int _practice(int i) { return i + 1; }
@@ -269,7 +218,7 @@ int _practice(int i) { return i + 1; }
 void _halt(void) { shutdown_power_off(); }
 
 void _exit(int status) {
-  printf("%s: exit(%d)\n", &thread_current()->name, status);
+  printf("%s: exit(%d)\n", thread_name(), status);
 
   struct list_elem *e = get_chldelem_parent(thread_current());
   if (e != NULL) {
@@ -363,14 +312,14 @@ int _read(int fd, void *buffer, unsigned size) {
   if (fd == 0) {
     char *charbuff = (char *)buffer;
     int i = 0;
-    for (i = 0; i < size; i++) {
+    for (i = 0; i < (int)size; i++) {
       charbuff[i] = input_getc();
     }
   }
 
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
-    _exit(-1);
+    return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
@@ -383,13 +332,12 @@ int _read(int fd, void *buffer, unsigned size) {
 int _write(int fd, const void *buffer, unsigned size) {
   if (fd == 1) {
     putbuf(buffer, size);
-    //  printf("\n write :   %s\n", buff);
     return size;
   }
 
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
-    _exit(-1);
+    return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
@@ -414,7 +362,7 @@ void _seek(int fd, unsigned position) {
 unsigned _tell(int fd) {
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
-    _exit(-1);
+    return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   lock_acquire(&filesys_lock);
