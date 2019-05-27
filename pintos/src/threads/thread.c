@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "devices/timer.h"
+#include "filesys/file.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -523,14 +524,13 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 
 #ifdef USERPROG
   t->parent_thread = NULL;
-
+  list_init(&(t->files.list));
+  lock_init(&(t->files.lock));
+  t->executable = NULL;
 #endif
   list_init(&(t->children.list));
   lock_init(&(t->children.lock));
-  list_init(&(t->files.list));
-  lock_init(&(t->files.lock));
 
-  t->executable = NULL;
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
@@ -572,7 +572,7 @@ static void free_child_list(struct thread *t) {
   }
   lock_release(&t->children.lock);
 }
-
+#ifdef USERPROG
 static void free_file_list(struct thread *t) {
   lock_acquire(&t->files.lock);
   while (!list_empty(&t->files.list)) {
@@ -583,6 +583,7 @@ static void free_file_list(struct thread *t) {
   }
   lock_release(&t->files.lock);
 }
+#endif
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
@@ -623,13 +624,10 @@ initial_thread because its memory was not obtained via
 palloc().) */
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) {
     ASSERT(prev != cur);
-
-#ifdef USERPROG
-
-    // TODO: remove from parent->children list & free
-#endif
     free_child_list(prev);
+#ifdef USERPROG
     free_file_list(prev);
+#endif
     palloc_free_page(prev);
   }
 }
@@ -771,7 +769,7 @@ struct list_elem *get_child_list_elem(struct thread *t, tid_t tid) {
   lock_release(&t->children.lock);
   return NULL;
 }
-
+#ifdef USERPROG
 struct list_elem *get_file_list_elem(int fd) {
   struct thread *t = thread_current();
   struct list_elem *e;
@@ -787,6 +785,7 @@ struct list_elem *get_file_list_elem(int fd) {
   lock_release(&t->files.lock);
   return NULL;
 }
+#endif
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

@@ -121,14 +121,12 @@ struct thread {
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
-  uint32_t *pagedir; /* Page directory. */
-  struct thread *parent_thread;
-
+  uint32_t *pagedir;       /* Page directory. */
+  struct file *executable; /* stores executable file for process */
+  struct syn_list_t files; /* stores open file descriptors */
 #endif
-  struct file *executable;
-  struct syn_list_t children; /* child threads */
-  struct syn_list_t files;
-
+  struct thread *parent_thread; /* stores parent thread */
+  struct syn_list_t children;   /* child threads */
   int nice;
   fixed_point_t recent_cpu;
 
