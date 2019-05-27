@@ -338,9 +338,6 @@ when it calls thread_schedule_tail(). */
 void thread_yield(void) {
   struct thread *cur = thread_current();
   enum intr_level old_level;
-  if (intr_context()) {
-    PANIC("%s %d", cur->name, cur->tid);
-  }
   ASSERT(!intr_context());
 
   old_level = intr_disable();
