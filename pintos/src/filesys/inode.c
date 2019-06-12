@@ -7,6 +7,8 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 
+#include "buffer_cache.h"
+
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
@@ -62,6 +64,7 @@ void
 inode_init (void)
 {
   list_init (&open_inodes);
+  buffer_cache_test();
 }
 
 /* Initializes an inode with LENGTH bytes of data and
