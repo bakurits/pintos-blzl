@@ -1,6 +1,7 @@
 #include "buffer_cache.h"
 
 #include "devices/block.h"
+#include "devices/timer.h"
 
 #include "threads/synch.h"
 #include "threads/malloc.h"
@@ -11,7 +12,9 @@
 #include "lib/string.h"
 
 const uint32_t CACHE_SIZE_IN_SECTORS = 64;
+const uint32_t AUTOMATIC_FLUSH_PERIOD_IN_SECS = 60;
 static struct cache_entry* cache_vec;
+int64_t last_flush_ticks = 0;
 
 struct cache_entry {
     block_sector_t sector;  
@@ -86,11 +89,22 @@ void buffer_cache_read(uint32_t sector, void* data, off_t size, off_t offset) {
     memcpy(data, cache_vec[entry_idx].data + offset, size);
 }
 
+bool buffer_cache_timeout(int64_t ticks) {
+    if (ticks >= last_flush_ticks + AUTOMATIC_FLUSH_PERIOD_IN_SECS * TIMER_FREQ)
+        return true;
+    return false;
+}
+
 void buffer_cache_full_flush(void) {
     unsigned int i;
     for (i=0; i<CACHE_SIZE_IN_SECTORS; i++) {
+        if (cache_vec[i].data == NULL)
+            continue;
+            
         block_write (fs_device, cache_vec[i].sector, cache_vec[i].data);
     }
+    // update last full_flush time
+    last_flush_ticks = timer_ticks();
 }
 
 
