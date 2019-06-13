@@ -18,11 +18,12 @@ int64_t last_flush_ticks = 0;
 
 // TODO: save free map in RAM & never evict
 // TODO: add synchronization
+// TODO: should change every block_read/write() with bufcache_read/write()? Some work on blocks other than fs_device ....
 
 struct cache_entry {
     block_sector_t sector;  
     void* data;             // NULL = not used
-    struct lock lock;       
+    struct rw_lock rw_lock;       
 };
 
 
@@ -31,7 +32,7 @@ void buffer_cache_init(void) {
     
     unsigned int i;
     for (i=0; i<CACHE_SIZE_IN_SECTORS; i++) {
-        lock_init(&cache_vec[i].lock);
+        rw_lock_init(&cache_vec[i].rw_lock);
     }
 }
 
@@ -53,7 +54,7 @@ int buffer_cache_find(uint32_t sector) {
     return -1;
 }
 
-// returns initialized free entry from cache_vec
+// returns initialized free entry index from cache_vec
 // does eviction if necessary
 static int buffer_cache_evict_single(void) {
     // search for empty entry, if exists
@@ -74,6 +75,7 @@ static int buffer_cache_evict_single(void) {
 void buffer_cache_read(uint32_t sector, void* data, off_t size, off_t offset) {
     ASSERT (offset + size <= BLOCK_SECTOR_SIZE);
     
+
     int entry_idx = buffer_cache_find(sector);
     if (entry_idx == -1) {
         entry_idx = buffer_cache_evict_single();
@@ -99,7 +101,7 @@ void buffer_cache_write(uint32_t sector, const void* data, off_t size, off_t off
 }
 
 
-
+// Note: should pass all tests without periodic flush [I think]
 bool buffer_cache_timeout(int64_t ticks) {
     if (ticks >= last_flush_ticks + FLUSH_PERIOD_IN_SECS * TIMER_FREQ)
         return true;
