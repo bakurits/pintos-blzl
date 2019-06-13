@@ -57,6 +57,39 @@ dir_open_root (void)
   return dir_open (inode_open (ROOT_DIR_SECTOR));
 }
 
+/* Opens the directory for given path and returns a directory for it.
+   Return true if successful, false on failure. */
+struct dir *dir_open_path(const struct dir* cwd, const char* path) {
+    if (path == NULL) return NULL;
+    struct dir* cur;
+    if (path[0] == '\0') {
+      cur = dir_open_root();
+    } else {
+      cur = dir_reopen(cwd);
+    }
+    
+    char* path_left = path;
+    while (true) {
+      char cur_file[FILENAME_MAX + 1];
+      int res = get_next_part(cur_file, &path_left);
+      if (res == -1) return NULL;
+      struct inode *inode = NULL;
+      if(!dir_lookup(cur, cur_file, &inode)) {
+        dir_close(cur);
+        return NULL; 
+      }
+      struct dir *next = dir_open(inode);
+      if(next == NULL) {
+        dir_close(cur);
+        return NULL;
+      }
+      dir_close(cur);
+      cur = next;
+      if (res == 0) break;
+    }
+    return cur;
+}
+
 /* Opens and returns a new directory for the same inode as DIR.
    Returns a null pointer on failure. */
 struct dir *
