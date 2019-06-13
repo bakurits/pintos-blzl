@@ -12,9 +12,12 @@
 #include "lib/string.h"
 
 const uint32_t CACHE_SIZE_IN_SECTORS = 64;
-const uint32_t AUTOMATIC_FLUSH_PERIOD_IN_SECS = 60;
+const uint32_t FLUSH_PERIOD_IN_SECS = 60;
 static struct cache_entry* cache_vec;
 int64_t last_flush_ticks = 0;
+
+// TODO: save free map in RAM & never evict
+// TODO: add synchronization
 
 struct cache_entry {
     block_sector_t sector;  
@@ -40,7 +43,7 @@ void buffer_cache_deinit(void) {
 }
 
 // TODO:
-int buffer_cache_find(uint32_t sector UNUSED) {
+int buffer_cache_find(uint32_t sector) {
     unsigned int i;
     for (i=0; i<CACHE_SIZE_IN_SECTORS; i++) {
         if (cache_vec[i].data != NULL && cache_vec[i].sector == sector) {
@@ -68,29 +71,37 @@ static int buffer_cache_evict_single(void) {
     return evict_idx;
 }
 
-
-void buffer_cache_write(uint32_t sector, const void* data, off_t size, off_t offset) {
-   int entry_idx = buffer_cache_find(sector);
-   if (entry_idx == -1) {
-       entry_idx = buffer_cache_evict_single();
-       cache_vec[entry_idx].sector = sector;
-   } 
-
-   memcpy(cache_vec[entry_idx].data+offset, data+offset, size);
-}
-
 void buffer_cache_read(uint32_t sector, void* data, off_t size, off_t offset) {
+    ASSERT (offset + size <= BLOCK_SECTOR_SIZE);
+    
     int entry_idx = buffer_cache_find(sector);
     if (entry_idx == -1) {
         entry_idx = buffer_cache_evict_single();
+        cache_vec[entry_idx].sector = sector;
         block_read(fs_device, sector, cache_vec[entry_idx].data);
     }
 
     memcpy(data, cache_vec[entry_idx].data + offset, size);
 }
 
+void buffer_cache_write(uint32_t sector, const void* data, off_t size, off_t offset) {
+    ASSERT (offset + size <= BLOCK_SECTOR_SIZE);
+    
+    int entry_idx = buffer_cache_find(sector);
+    if (entry_idx == -1) {
+        entry_idx = buffer_cache_evict_single();
+        cache_vec[entry_idx].sector = sector;
+        block_read(fs_device, sector, cache_vec[entry_idx].data);
+    } 
+
+    memcpy(cache_vec[entry_idx].data + offset, data, size);
+    block_write(fs_device, sector, cache_vec[entry_idx].data);
+}
+
+
+
 bool buffer_cache_timeout(int64_t ticks) {
-    if (ticks >= last_flush_ticks + AUTOMATIC_FLUSH_PERIOD_IN_SECS * TIMER_FREQ)
+    if (ticks >= last_flush_ticks + FLUSH_PERIOD_IN_SECS * TIMER_FREQ)
         return true;
     return false;
 }

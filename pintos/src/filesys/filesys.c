@@ -39,6 +39,7 @@ filesys_done (void)
 {
   free_map_close ();
   buffer_cache_full_flush();
+  buffer_cache_deinit();
 }
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
