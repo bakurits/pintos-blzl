@@ -234,7 +234,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 				deallocate_block_array (block_arr, block_arr_len);
 				free_map_release (indirect_block_arr[j], 1);
 			}
-			free_map_release (disk_inode->indirect_blocks[i]);
+			free_map_release (disk_inode->indirect_blocks[i], 1);
 		}
 
 		// Free structure
