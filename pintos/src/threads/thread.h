@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "filesys/directory.h"
 #include "filesys/file.h"
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
@@ -38,10 +39,6 @@ struct file_info_t {
   struct file *file_data;
 };
 
-struct syn_list_t {
-  struct lock lock;
-  struct list list;
-};
 
 /* A kernel thread or user process.
 
@@ -125,6 +122,7 @@ struct thread {
   struct file *executable; /* stores executable file for process */
   struct syn_list_t files; /* stores open file descriptors */
 #endif
+  struct dir *cwd;
   struct thread *parent_thread; /* stores parent thread */
   struct syn_list_t children;   /* child threads */
   int nice;

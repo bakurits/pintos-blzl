@@ -11,7 +11,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define DIRECT_BLOCK_NUM 123
+#define DIRECT_BLOCK_NUM 122
 #define INDIRECT_BLOCK_NUM 1
 #define D_INDIRECT_BLOCK_NUM 1  
 #define INDIRECT_BLOCK_SIZE BLOCK_SECTOR_SIZE / sizeof (block_sector_t)
@@ -22,6 +22,7 @@ struct inode_disk
   {
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */   
+    unsigned is_dir;
 
     block_sector_t direct_blocks[DIRECT_BLOCK_NUM];
     block_sector_t indirect_blocks[INDIRECT_BLOCK_NUM];
@@ -105,7 +106,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -123,6 +124,7 @@ inode_create (block_sector_t sector, off_t length)
 	  if (sectors > MAXIMUM_NUMBER_OF_BLOCKS) {
 		  goto revert;
 	  }
+      disk_inode->is_dir = is_dir;
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
         static char zeros[BLOCK_SECTOR_SIZE];
@@ -375,4 +377,9 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+/* Returns true if inode represents directory */
+bool inode_is_dir(struct inode* inode) {
+  return inode->data.is_dir;
 }

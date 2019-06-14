@@ -17,11 +17,11 @@
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 
-static struct lock filesys_lock;
+// static struct lock filesys_lock;
 static void syscall_handler(struct intr_frame *);
 
 void syscall_init(void) {
-  lock_init(&filesys_lock);
+  // lock_init(&filesys_lock);
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -39,6 +39,11 @@ static void syscall_seek(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_tell(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_close(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args);
+static void syscall_chdir(struct intr_frame *f UNUSED, uint32_t *args);
+static void syscall_mkdir(struct intr_frame *f UNUSED, uint32_t *args);
+static void syscall_readdir(struct intr_frame *f UNUSED, uint32_t *args);
+static void syscall_isdir(struct intr_frame *f UNUSED, uint32_t *args);
+static void syscall_inumber(struct intr_frame *f UNUSED, uint32_t *args);
 
 typedef void (*syscall_func_t)(struct intr_frame *f UNUSED, uint32_t *args);
 
@@ -52,11 +57,12 @@ static bool valid_ptr(void *ptr, int size) {
   return true;
 }
 
-syscall_func_t syscall_func_arr[14] = {
-    syscall_halt,   syscall_exit,    syscall_exec, syscall_wait,
-    syscall_create, syscall_remove,  syscall_open, syscall_filesize,
-    syscall_read,   syscall_write,   syscall_seek, syscall_tell,
-    syscall_close,  syscall_practice};
+syscall_func_t syscall_func_arr[19] = {
+    syscall_halt,    syscall_exit,     syscall_exec,   syscall_wait,
+    syscall_create,  syscall_remove,   syscall_open,   syscall_filesize,
+    syscall_read,    syscall_write,    syscall_seek,   syscall_tell,
+    syscall_close,   syscall_practice, syscall_chdir,  syscall_mkdir,
+    syscall_readdir, syscall_isdir,    syscall_inumber};
 
 static void syscall_handler(struct intr_frame *f UNUSED) {
   uint32_t *args = ((uint32_t *)f->esp);
@@ -213,6 +219,53 @@ static void syscall_practice(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = _practice((int)args[1]);
 }
 
+static void syscall_chdir(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr((void *)(args + 1), sizeof(char *))) {
+    _exit(-1);
+  }
+  if (!valid_ptr((void *)args[1], sizeof(char))) {
+    _exit(-1);
+  }
+
+  f->eax = _chdir((char *)args[1]);
+}
+static void syscall_mkdir(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr((void *)(args + 1), sizeof(char *))) {
+    _exit(-1);
+  }
+  if (!valid_ptr((void *)args[1], sizeof(char))) {
+    _exit(-1);
+  }
+
+  f->eax = _mkdir((char *)args[1]);
+}
+static void syscall_readdir(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int) + sizeof(char *))) {
+    _exit(-1);
+  }
+  if (!valid_ptr((void *)args[2], sizeof(char))) {
+    _exit(-1);
+  }
+  int fd = (int)args[1];
+  char *name = (void *)args[2];
+
+  f->eax = _readdir(fd, name);
+}
+static void syscall_isdir(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int))) {
+    _exit(-1);
+  };
+  int fd = (int)args[1];
+  f->eax = _isdir(fd);
+}
+static void syscall_inumber(struct intr_frame *f UNUSED, uint32_t *args) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int))) {
+    _exit(-1);
+  };
+  int fd = (int)args[1];
+  f->eax = _inumber(fd);
+}
+
 int _practice(int i) { return i + 1; }
 
 void _halt(void) { shutdown_power_off(); }
@@ -229,9 +282,9 @@ void _exit(int status) {
 }
 
 pid_t _exec(const char *cmd_line) {
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   tid_t process_pid = process_execute(cmd_line);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return process_pid;
 }
 
@@ -241,16 +294,16 @@ int _wait(pid_t pid) {
 }
 
 bool _create(const char *file, unsigned initial_size) {
-  lock_acquire(&filesys_lock);
-  bool res = filesys_create(file, initial_size);
-  lock_release(&filesys_lock);
+  // lock_acquire(&filesys_lock);
+  bool res = filesys_create(file, initial_size, 0);
+  // lock_release(&filesys_lock);
   return res;
 }
 
 bool _remove(const char *file) {
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   bool res = filesys_remove(file);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -268,10 +321,10 @@ int _open(const char *file) {
     new_fd = front_file_info->fd + 1;
   }
   lock_release(&(thread_current()->files.lock));
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   // Get file struct of given path
   struct file *cur_file_data = filesys_open(file);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   int res;
 
   if (cur_file_data == NULL) {
@@ -302,9 +355,9 @@ int _filesize(int fd) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   int res = file_length(file->file_data);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -323,9 +376,9 @@ int _read(int fd, void *buffer, unsigned size) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   int res = file_read(file->file_data, buffer, size);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -340,10 +393,12 @@ int _write(int fd, const void *buffer, unsigned size) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  struct inode *inode = file->file_data->inode;
+  if (inode_is_dir(inode)) return -1;
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   int res = file_write(file->file_data, buffer, size);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -354,9 +409,9 @@ void _seek(int fd, unsigned position) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   file_seek(file->file_data, position);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
 }
 
 unsigned _tell(int fd) {
@@ -365,9 +420,9 @@ unsigned _tell(int fd) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   unsigned res = file_tell(file->file_data);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -378,11 +433,53 @@ void _close(int fd) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   file_close(file->file_data);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   lock_acquire(&thread_current()->files.lock);
   list_remove(&file->elem);
   lock_release(&thread_current()->files.lock);
   free(file);
+}
+
+bool _chdir(const char *dir) {
+  struct dir *new_dir = dir_open_path(thread_current()->cwd, (char *)dir);
+  if (dir == NULL) {
+    return false;
+  }
+  dir_close(thread_current()->cwd);
+  thread_current()->cwd = new_dir;
+  return true;
+}
+
+bool _mkdir(const char *dir) { return filesys_create(dir, 20, Directory); }
+
+bool _readdir(int fd, char *name) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
+    return false;
+  }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  struct inode *inode = file->file_data->inode;
+  if (!inode_is_dir(inode)) return false;
+  struct dir *dir = dir_open(inode);
+  return dir_readdir(dir, name);
+}
+
+bool _isdir(int fd) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
+    return false;
+  }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  return inode_is_dir(file->file_data->inode);
+}
+
+int _inumber(int fd) {
+  struct list_elem *e = get_file_list_elem(fd);
+  if (e == NULL) {
+    return -1;
+  }
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  return inode_get_inumber(file->file_data->inode);
 }
