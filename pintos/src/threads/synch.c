@@ -355,3 +355,33 @@ void cond_broadcast(struct condition *cond, struct lock *lock) {
 
   while (!list_empty(&cond->waiters)) cond_signal(cond, lock);
 }
+
+void rw_lock_init(struct rw_lock* rw) {
+  lock_init(&rw->r_lock);
+  lock_init(&rw->w_lock);
+  rw->waiters = 0;
+}
+
+void rw_read_lock(struct rw_lock* rw) {
+  lock_acquire(&rw->r_lock);
+  rw->waiters ++;
+  if (rw->waiters == 1)
+    lock_acquire(&rw->w_lock);
+  lock_release(&rw->r_lock);
+}
+
+void rw_read_unlock(struct rw_lock* rw) {
+  lock_acquire(&rw->r_lock);
+  rw->waiters --;
+  if (rw->waiters == 0)
+    lock_release(&rw->w_lock);
+  lock_release(&rw->r_lock);
+}
+
+void rw_write_lock(struct rw_lock* rw) {
+  lock_acquire(&rw->w_lock);
+}
+void rw_write_unlock(struct rw_lock* rw) {
+  lock_release(&rw->w_lock);
+}
+

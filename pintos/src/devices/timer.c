@@ -8,6 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "filesys/buffer_cache.h"
 
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -188,6 +189,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  // TODO: is this the right place?
+  if (buffer_cache_timeout(ticks)) 
+    buffer_cache_full_flush();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

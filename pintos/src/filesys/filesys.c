@@ -7,6 +7,7 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "threads/thread.h"
+#include "filesys/buffer_cache.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -24,7 +25,8 @@ filesys_init (bool format)
 
   inode_init ();
   free_map_init ();
-
+  buffer_cache_init();
+  
   if (format)
     do_format ();
 
@@ -37,6 +39,8 @@ void
 filesys_done (void)
 {
   free_map_close ();
+  buffer_cache_full_flush();
+  buffer_cache_deinit();
 }
 
 static int split_file_path(const char* whole_path, char* dir, char* file) {

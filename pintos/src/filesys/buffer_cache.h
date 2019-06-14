@@ -19,5 +19,8 @@ void buffer_cache_read(uint32_t sector, void* data, off_t size, off_t offset);
 // Flushes all in memory sectors to disk 
 // (For periodical flushing)
 void buffer_cache_full_flush(void);
+// Returns true if full_flush is required
+// (Automatic flush period passed)
+bool buffer_cache_timeout(int64_t ticks);
 
 int buffer_cache_test(void);
