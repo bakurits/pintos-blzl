@@ -126,6 +126,7 @@ static void start_process(void *argv) {
   char *file_name = args_data->argv[0];
   struct intr_frame if_;
   bool success;
+  struct thread *t = thread_current();
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -136,12 +137,14 @@ static void start_process(void *argv) {
 
   args_data->status = success;
   sema_up(&(args_data->load_status_sem));
-  //   int sz = PHYS_BASE - if_.esp;
-  //   hex_dump(0, if_.esp, sz, true);
-  /* If load failed, quit. */
   if (!success) {
     palloc_free_page(args_data->argv[0]);
     thread_exit();
+  }
+  if (t->parent_thread == NULL || t->parent_thread->cwd == NULL) {
+    t->cwd = dir_open_root();
+  } else {
+    t->cwd = dir_reopen(t->parent_thread->cwd);
   }
 
   if_.esp = load_args(if_.esp, args_data);

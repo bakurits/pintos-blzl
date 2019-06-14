@@ -626,6 +626,7 @@ palloc().) */
     ASSERT(prev != cur);
     free_child_list(prev);
 #ifdef USERPROG
+    dir_close(prev->cwd);
     free_file_list(prev);
 #endif
     palloc_free_page(prev);
