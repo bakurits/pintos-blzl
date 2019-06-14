@@ -191,7 +191,6 @@ bool
 inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 {
   struct inode_disk *disk_inode = NULL;
-
   ASSERT (length >= 0);
 
   /* If this assertion fails, the inode structure is not exactly
@@ -206,6 +205,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 	  if (sectors > MAXIMUM_NUMBER_OF_BLOCKS) {
 		  goto revert;
 	  }
+	
       disk_inode->is_dir = is_dir;
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
@@ -217,9 +217,10 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 		if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
 			goto revert;
 		}
+
 		sectors -= min (block_arr_len, sectors);
 		if (sectors == 0) {
-			return true;
+			goto finish;
 		}
 
 		int i = 0;
@@ -237,7 +238,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 			}
 			sectors -= min (block_arr_len, sectors);
 			if (sectors == 0) {
-				return true;
+				goto finish;
 			}
 
 			block_write (fs_device, disk_inode->indirect_blocks[i], direct_block_arr);
@@ -260,17 +261,19 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 				}
 				sectors -= min (block_arr_len, sectors);
 				if (sectors == 0) {
-					return true;
+					goto finish;
 				}
 				block_write (fs_device, indirect_block_arr[j], direct_block_arr);
 			}
 
 			block_write (fs_device, disk_inode->indirect_blocks[i], indirect_block_arr);			
 		}
-		block_write (fs_device, sector, disk_inode);
+
 		free (disk_inode);
 
-  return true;
+	finish :
+		block_write (fs_device, sector, disk_inode);
+  		return true;
 
 	revert :
 		deallocate_inode_on_disk (disk_inode, block_arr, block_arr_len);
