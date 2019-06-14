@@ -6,6 +6,7 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "threads/thread.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -38,25 +39,62 @@ filesys_done (void)
   free_map_close ();
 }
 
+static int split_file_path(const char* whole_path, char* dir, char* file) {
+  dir[0] = file[0] = '\0';
+  int n = strlen(whole_path);
+  int i;
+  for (i = n - 1; i >= 0; i--) {
+    if (whole_path[i] == '/') {
+      strlcpy(dir, whole_path, i - 1);
+      strlcpy(file, &whole_path[i + 1], n - i);
+      return true;
+    }
+  }
+  if (n > NAME_MAX) return false;
+  
+  strlcpy(file, whole_path, n + 1);
+  return true;
+}
+
 /* Creates a file named NAME with the given INITIAL_SIZE.
    Returns true if successful, false otherwise.
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size)
+filesys_create (const char *name, off_t initial_size, enum file_type_t type)
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
+
+	char dir_path[strlen(name)];
+	char file_name[NAME_MAX + 1];
+
+	split_file_path(name, dir_path, file_name);
+
+  struct dir* dir = dir_open_path (thread_current()->cwd,  dir_path);
+  
   bool success = (dir != NULL
-                  && free_map_allocate (1, &inode_sector)
-                  && inode_create (inode_sector, initial_size)
-                  && dir_add (dir, name, inode_sector));
+                  && free_map_allocate (1, &inode_sector));
+  if (!success) goto finish;
+  if (type == Directory) {
+    
+    success = dir_create(inode_sector, initial_size);
+    if (!success) goto finish;
+    struct dir* new_dir = dir_open(inode_open(inode_sector));
+    dir_add(new_dir, "..",  inode_get_inumber(dir_get_inode(dir)));
+    dir_add(new_dir, ".",  inode_get_inumber(dir_get_inode(new_dir)));
+  } else {
+    inode_create (inode_sector, initial_size, 0);
+  }
+  success = dir_add (dir, file_name, inode_sector);
+
+finish:
   if (!success && inode_sector != 0)
     free_map_release (inode_sector, 1);
-  dir_close (dir);
 
+  dir_close (dir);
+          
   return success;
-}
+} 
 
 /* Opens the file with the given NAME.
    Returns the new file if successful or a null pointer
@@ -66,9 +104,10 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
+  
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
-
+  
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
   dir_close (dir);

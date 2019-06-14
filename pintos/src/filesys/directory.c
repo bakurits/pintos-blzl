@@ -26,7 +26,7 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), 1);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -54,23 +54,30 @@ dir_open (struct inode *inode)
 struct dir *
 dir_open_root (void)
 {
+   
   return dir_open (inode_open (ROOT_DIR_SECTOR));
 }
 
 /* Opens the directory for given path and returns a directory for it.
    Return true if successful, false on failure. */
-struct dir *dir_open_path(const struct dir* cwd, const char* path) {
+struct dir *dir_open_path(struct dir* cwd, char* path) {
     if (path == NULL) return NULL;
+    
     struct dir* cur;
     if (path[0] == '\0') {
       cur = dir_open_root();
     } else {
-      cur = dir_reopen(cwd);
+      if (cwd != NULL)
+        cur = dir_reopen(cwd);
+      else 
+        cur = dir_open_root();
     }
-    
-    char* path_left = path;
+    if (strlen(path) == 0) return cur;
+    const char* path_left = path;
+
+      
     while (true) {
-      char cur_file[FILENAME_MAX + 1];
+      char cur_file[NAME_MAX + 1];
       int res = get_next_part(cur_file, &path_left);
       if (res == -1) return NULL;
       struct inode *inode = NULL;
@@ -95,6 +102,8 @@ struct dir *dir_open_path(const struct dir* cwd, const char* path) {
 struct dir *
 dir_reopen (struct dir *dir)
 {
+  ASSERT(dir != NULL);
+  ASSERT(dir->inode != NULL);
   return dir_open (inode_reopen (dir->inode));
 }
 
@@ -135,6 +144,7 @@ lookup (const struct dir *dir, const char *name,
        ofs += sizeof e)
     if (e.in_use && !strcmp (name, e.name))
       {
+        
         if (ep != NULL)
           *ep = e;
         if (ofsp != NULL)
@@ -266,4 +276,32 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
         }
     }
   return false;
+}
+
+/* Extracts a file name part from *SRCP into PART, and updates *SRCP so that the
+next call will return the next file name part. Returns 1 if successful, 0 at
+end of string, -1 for a too-long file name part. */
+int
+get_next_part (char part[NAME_MAX + 1], const char **srcp) {
+	const char *src = *srcp;
+	char *dst = part;
+	/* Skip leading slashes. If it’s all slashes, we’re done. */
+	while (*src == '/')
+			src++;
+	if (*src == '\0')
+		return 0;
+
+	/* Copy up to NAME_MAX character from SRC to DST. Add null terminator. */
+	while (*src != '/' && *src != '\0') {
+		if (dst < part + NAME_MAX)
+			*dst++ = *src;
+		else
+			return -1;
+		src++;
+	}
+	*dst = '\0';
+
+	/* Advance source pointer. */
+	*srcp = src;
+	return 1;
 }

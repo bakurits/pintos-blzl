@@ -125,6 +125,7 @@ struct thread {
   struct file *executable; /* stores executable file for process */
   struct syn_list_t files; /* stores open file descriptors */
 #endif
+  struct dir* cwd;
   struct thread *parent_thread; /* stores parent thread */
   struct syn_list_t children;   /* child threads */
   int nice;
