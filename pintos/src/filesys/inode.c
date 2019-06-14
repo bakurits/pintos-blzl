@@ -121,6 +121,49 @@ void deallocate_block_array (block_sector_t * arr, size_t size) {
 	}
 }
 
+void deallocate_inode_on_disk (struct inode_disk * disk_inode, block_sector_t* block_arr, size_t block_arr_len) {
+	if (block_arr == NULL) {
+		// Revert blocks left in block_arr array
+		deallocate_block_array (block_arr, block_arr_len);
+	}
+	int i = 0, j = 0;
+
+	// Revert direct blocks
+	block_sector_t * block_arr = &(disk_inode->direct_blocks);
+	size_t block_arr_len = DIRECT_BLOCK_NUM;
+	deallocate_block_array (block_arr, block_arr_len);	
+
+	// Revert indirect blocks
+	for (i = 0; i < INDIRECT_BLOCK_NUM; i ++) {
+		if (disk_inode -> indirect_blocks[i] == 0) {
+			return false;
+		}
+		block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
+		block_arr = &direct_block_arr;
+		block_arr_len = INDIRECT_BLOCK_SIZE;
+		block_read (fs_device, disk_inode->indirect_blocks[i], block_arr);
+		deallocate_block_array (block_arr, block_arr_len);
+		free_map_release (disk_inode->indirect_blocks[i], 1);
+	}
+
+	// Revert doubly indirect blocks
+	for (i = 0; i < D_INDIRECT_BLOCK_NUM; i ++) {
+		block_sector_t indirect_block_arr[INDIRECT_BLOCK_SIZE];
+
+		block_read (fs_device, disk_inode->d_indirect_blocks[i], indirect_block_arr);
+
+		for (j = 0; j < INDIRECT_BLOCK_SIZE; j ++) {
+			block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
+			block_arr = &direct_block_arr;
+			block_arr_len = INDIRECT_BLOCK_SIZE;
+			block_read (fs_device, indirect_block_arr[j], block_arr);		
+			deallocate_block_array (block_arr, block_arr_len);
+			free_map_release (indirect_block_arr[j], 1);
+		}
+		free_map_release (disk_inode->indirect_blocks[i], 1);
+	}
+}
+
 /* Initializes an inode with LENGTH bytes of data and
    writes the new inode to sector SECTOR on the file system
    device.
@@ -199,43 +242,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
   return true;
 
 	revert :
-		// Revert blocks left in block_arr array
-		deallocate_block_array (block_arr, block_arr_len);
-
-		// Revert direct blocks
-		block_sector_t * block_arr = &(disk_inode->direct_blocks);
-		size_t block_arr_len = DIRECT_BLOCK_NUM;
-		deallocate_block_array (block_arr, block_arr_len);	
-
-		// Revert indirect blocks
-		for (i = 0; i < INDIRECT_BLOCK_NUM; i ++) {
-			if (disk_inode -> indirect_blocks[i] == 0) {
-				return false;
-			}
-			block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
-			block_arr = &direct_block_arr;
-			block_arr_len = INDIRECT_BLOCK_SIZE;
-			block_read (fs_device, disk_inode->indirect_blocks[i], block_arr);
-			deallocate_block_array (block_arr, block_arr_len);
-			free_map_release (disk_inode->indirect_blocks[i], 1);
-		}
-
-		// Revert doubly indirect blocks
-		for (i = 0; i < D_INDIRECT_BLOCK_NUM; i ++) {
-			block_sector_t indirect_block_arr[INDIRECT_BLOCK_SIZE];
-
-			block_read (fs_device, disk_inode->d_indirect_blocks[i], indirect_block_arr);
-
-			for (j = 0; j < INDIRECT_BLOCK_SIZE; j ++) {
-				block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
-				block_arr = &direct_block_arr;
-				block_arr_len = INDIRECT_BLOCK_SIZE;
-				block_read (fs_device, indirect_block_arr[j], block_arr);		
-				deallocate_block_array (block_arr, block_arr_len);
-				free_map_release (indirect_block_arr[j], 1);
-			}
-			free_map_release (disk_inode->indirect_blocks[i], 1);
-		}
+		deallocate_inode_on_disk (disk_inode, block_arr, block_arr_len);
 
 		// Free structure
 		free (disk_inode);
@@ -314,10 +321,9 @@ inode_close (struct inode *inode)
       //DASAWERIA
       if (inode->removed)
         {
+		deallocate_inode_on_disk (&(inode->data), NULL, 0);
           free_map_release (inode->sector, 1);
-		  //TODO: Edit
-        //   free_map_release (inode->data.start,
-        //                     bytes_to_sectors (inode->data.length));
+		
         }
 
       free (inode);
