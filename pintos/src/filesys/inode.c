@@ -194,10 +194,14 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
         static char zeros[BLOCK_SECTOR_SIZE];
 
 		block_sector_t * block_arr = &(disk_inode->direct_blocks);
-		size_t block_arr_len = DIRECT_BLOCK_NUM;
+		size_t block_arr_len = min (DIRECT_BLOCK_NUM, sectors);
 
 		if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
 			goto revert;
+		}
+		sectors -= min (block_arr_len, sectors);
+		if (sectors == 0) {
+			return true;
 		}
 
 		int i = 0;
@@ -209,9 +213,13 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 
 			block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
 			block_arr = &direct_block_arr;
-			block_arr_len = INDIRECT_BLOCK_SIZE;
+			block_arr_len = min (INDIRECT_BLOCK_SIZE, sectors);
 			if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
 				goto revert;
+			}
+			sectors -= min (block_arr_len, sectors);
+			if (sectors == 0) {
+				return true;
 			}
 
 			block_write (fs_device, disk_inode->indirect_blocks[i], direct_block_arr);
@@ -228,9 +236,13 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 			for (j = 0; j < INDIRECT_BLOCK_SIZE; j ++) {
 				block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
 				block_arr = &direct_block_arr;
-				block_arr_len = INDIRECT_BLOCK_SIZE;
+				block_arr_len = min (INDIRECT_BLOCK_SIZE, sectors);
 				if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
 					goto revert;
+				}
+				sectors -= min (block_arr_len, sectors);
+				if (sectors == 0) {
+					return true;
 				}
 				block_write (fs_device, indirect_block_arr[j], direct_block_arr);
 			}
@@ -375,6 +387,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   return bytes_read;
 }
 
+
+
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
    less than SIZE if end of file is reached or an error occurs.
@@ -389,6 +403,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
+
+	//Needs to grow
 
   while (size > 0)
     {
