@@ -126,7 +126,7 @@ static void start_process(void *argv) {
   char *file_name = args_data->argv[0];
   struct intr_frame if_;
   bool success;
-  struct thread* t = thread_current();
+  struct thread *t = thread_current();
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -142,7 +142,7 @@ static void start_process(void *argv) {
     thread_exit();
   }
   if (t->parent_thread == NULL || t->parent_thread->cwd == NULL) {
-    t->cwd = dir_open_root(); 
+    t->cwd = dir_open_root();
   } else {
     t->cwd = dir_reopen(t->parent_thread->cwd);
   }

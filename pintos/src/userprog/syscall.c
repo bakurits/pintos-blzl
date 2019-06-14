@@ -45,8 +45,6 @@ static void syscall_readdir(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_isdir(struct intr_frame *f UNUSED, uint32_t *args);
 static void syscall_inumber(struct intr_frame *f UNUSED, uint32_t *args);
 
-
-
 typedef void (*syscall_func_t)(struct intr_frame *f UNUSED, uint32_t *args);
 
 static bool valid_ptr(void *ptr, int size) {
@@ -60,11 +58,11 @@ static bool valid_ptr(void *ptr, int size) {
 }
 
 syscall_func_t syscall_func_arr[19] = {
-    syscall_halt,   syscall_exit,    syscall_exec, syscall_wait,
-    syscall_create, syscall_remove,  syscall_open, syscall_filesize,
-    syscall_read,   syscall_write,   syscall_seek, syscall_tell,
-    syscall_close,  syscall_practice, syscall_chdir, syscall_mkdir, 
-    syscall_readdir, syscall_isdir, syscall_inumber };
+    syscall_halt,    syscall_exit,     syscall_exec,   syscall_wait,
+    syscall_create,  syscall_remove,   syscall_open,   syscall_filesize,
+    syscall_read,    syscall_write,    syscall_seek,   syscall_tell,
+    syscall_close,   syscall_practice, syscall_chdir,  syscall_mkdir,
+    syscall_readdir, syscall_isdir,    syscall_inumber};
 
 static void syscall_handler(struct intr_frame *f UNUSED) {
   uint32_t *args = ((uint32_t *)f->esp);
@@ -242,8 +240,7 @@ static void syscall_mkdir(struct intr_frame *f UNUSED, uint32_t *args) {
   f->eax = _mkdir((char *)args[1]);
 }
 static void syscall_readdir(struct intr_frame *f UNUSED, uint32_t *args) {
-  if (!valid_ptr((void *)(args + 1),
-                 sizeof(int) + sizeof(char *))) {
+  if (!valid_ptr((void *)(args + 1), sizeof(int) + sizeof(char *))) {
     _exit(-1);
   }
   if (!valid_ptr((void *)args[2], sizeof(char))) {
@@ -268,7 +265,6 @@ static void syscall_inumber(struct intr_frame *f UNUSED, uint32_t *args) {
   int fd = (int)args[1];
   f->eax = _inumber(fd);
 }
-
 
 int _practice(int i) { return i + 1; }
 
@@ -397,6 +393,8 @@ int _write(int fd, const void *buffer, unsigned size) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  struct inode *inode = file->file_data->inode;
+  if (inode_is_dir(inode)) return -1;
 
   lock_acquire(&filesys_lock);
   int res = file_write(file->file_data, buffer, size);
@@ -444,10 +442,9 @@ void _close(int fd) {
   free(file);
 }
 
-
-bool _chdir (const char *dir) {
-  struct dir* new_dir = dir_open_path (thread_current()->cwd, (char*)dir);
-  if(dir == NULL) {
+bool _chdir(const char *dir) {
+  struct dir *new_dir = dir_open_path(thread_current()->cwd, (char *)dir);
+  if (dir == NULL) {
     return false;
   }
   dir_close(thread_current()->cwd);
@@ -455,36 +452,34 @@ bool _chdir (const char *dir) {
   return true;
 }
 
-bool _mkdir (const char *dir) {
-  return filesys_create(dir, 20, Directory);
-}
+bool _mkdir(const char *dir) { return filesys_create(dir, 20, Directory); }
 
-bool _readdir (int fd, char *name) {
+bool _readdir(int fd, char *name) {
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
     return false;
   }
-  struct file_info_t *file = list_entry(e, struct file_info_t, elem); 
-  struct inode* inode = file->file_data->inode;
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  struct inode *inode = file->file_data->inode;
   if (!inode_is_dir(inode)) return false;
-  struct dir* dir = dir_open(inode);
+  struct dir *dir = dir_open(inode);
   return dir_readdir(dir, name);
 }
 
-bool _isdir (int fd) {
+bool _isdir(int fd) {
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
     return false;
   }
-  struct file_info_t *file = list_entry(e, struct file_info_t, elem); 
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   return inode_is_dir(file->file_data->inode);
 }
 
-int _inumber (int fd) {
+int _inumber(int fd) {
   struct list_elem *e = get_file_list_elem(fd);
   if (e == NULL) {
     return -1;
   }
-  struct file_info_t *file = list_entry(e, struct file_info_t, elem); 
+  struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   return inode_get_inumber(file->file_data->inode);
 }
