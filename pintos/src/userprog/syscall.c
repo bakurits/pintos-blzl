@@ -17,11 +17,11 @@
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 
-static struct lock filesys_lock;
+// static struct lock filesys_lock;
 static void syscall_handler(struct intr_frame *);
 
 void syscall_init(void) {
-  lock_init(&filesys_lock);
+  // lock_init(&filesys_lock);
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -229,9 +229,9 @@ void _exit(int status) {
 }
 
 pid_t _exec(const char *cmd_line) {
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   tid_t process_pid = process_execute(cmd_line);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return process_pid;
 }
 
@@ -241,16 +241,16 @@ int _wait(pid_t pid) {
 }
 
 bool _create(const char *file, unsigned initial_size) {
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   bool res = filesys_create(file, initial_size);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
 bool _remove(const char *file) {
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   bool res = filesys_remove(file);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -268,10 +268,10 @@ int _open(const char *file) {
     new_fd = front_file_info->fd + 1;
   }
   lock_release(&(thread_current()->files.lock));
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   // Get file struct of given path
   struct file *cur_file_data = filesys_open(file);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   int res;
 
   if (cur_file_data == NULL) {
@@ -302,9 +302,9 @@ int _filesize(int fd) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   int res = file_length(file->file_data);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -323,9 +323,9 @@ int _read(int fd, void *buffer, unsigned size) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   int res = file_read(file->file_data, buffer, size);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -341,9 +341,9 @@ int _write(int fd, const void *buffer, unsigned size) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   int res = file_write(file->file_data, buffer, size);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -354,9 +354,9 @@ void _seek(int fd, unsigned position) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   file_seek(file->file_data, position);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
 }
 
 unsigned _tell(int fd) {
@@ -365,9 +365,9 @@ unsigned _tell(int fd) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   unsigned res = file_tell(file->file_data);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   return res;
 }
 
@@ -378,9 +378,9 @@ void _close(int fd) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
-  lock_acquire(&filesys_lock);
+  // lock_acquire(&filesys_lock);
   file_close(file->file_data);
-  lock_release(&filesys_lock);
+  // lock_release(&filesys_lock);
   lock_acquire(&thread_current()->files.lock);
   list_remove(&file->elem);
   lock_release(&thread_current()->files.lock);

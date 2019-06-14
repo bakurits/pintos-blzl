@@ -38,10 +38,6 @@ struct file_info_t {
   struct file *file_data;
 };
 
-struct syn_list_t {
-  struct lock lock;
-  struct list list;
-};
 
 /* A kernel thread or user process.
 
