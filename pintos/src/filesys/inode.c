@@ -16,6 +16,7 @@
 #define D_INDIRECT_BLOCK_NUM 1  
 #define INDIRECT_BLOCK_SIZE BLOCK_SECTOR_SIZE / sizeof (block_sector_t)
 #define MAXIMUM_NUMBER_OF_BLOCKS DIRECT_BLOCK_NUM + INDIRECT_BLOCK_SIZE * (INDIRECT_BLOCK_NUM + D_INDIRECT_BLOCK_NUM*INDIRECT_BLOCK_SIZE)
+#define min(a,b) ( a<b? a:b)
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
@@ -36,6 +37,10 @@ bytes_to_sectors (off_t size)
 {
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
+
+static void deallocate_block_array (block_sector_t * arr, size_t size);
+static bool allocate_block_array (block_sector_t * arr, size_t size);
+static void deallocate_inode_on_disk (struct inode_disk * disk_inode, block_sector_t* block_arr, size_t block_arr_len);
 
 /* In-memory inode. */
 struct inode
@@ -113,7 +118,7 @@ bool allocate_block_array (block_sector_t * arr, size_t size) {
 
 void deallocate_block_array (block_sector_t * arr, size_t size) {
 	size_t i = 0;
-	for (int i = 0; i < size; i ++) {
+	for (i = 0; i < size; i ++) {
 		if (arr[i] == 0) {
 			break;
 		}
@@ -129,8 +134,8 @@ void deallocate_inode_on_disk (struct inode_disk * disk_inode, block_sector_t* b
 	int i = 0, j = 0;
 
 	// Revert direct blocks
-	block_sector_t * block_arr = &(disk_inode->direct_blocks);
-	size_t block_arr_len = DIRECT_BLOCK_NUM;
+	block_arr = disk_inode->direct_blocks;
+	block_arr_len = DIRECT_BLOCK_NUM;
 	deallocate_block_array (block_arr, block_arr_len);	
 
 	// Revert indirect blocks
@@ -139,7 +144,7 @@ void deallocate_inode_on_disk (struct inode_disk * disk_inode, block_sector_t* b
 			return false;
 		}
 		block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
-		block_arr = &direct_block_arr;
+		block_arr = direct_block_arr;
 		block_arr_len = INDIRECT_BLOCK_SIZE;
 		block_read (fs_device, disk_inode->indirect_blocks[i], block_arr);
 		deallocate_block_array (block_arr, block_arr_len);
@@ -154,7 +159,7 @@ void deallocate_inode_on_disk (struct inode_disk * disk_inode, block_sector_t* b
 
 		for (j = 0; j < INDIRECT_BLOCK_SIZE; j ++) {
 			block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
-			block_arr = &direct_block_arr;
+			block_arr = direct_block_arr;
 			block_arr_len = INDIRECT_BLOCK_SIZE;
 			block_read (fs_device, indirect_block_arr[j], block_arr);		
 			deallocate_block_array (block_arr, block_arr_len);
@@ -193,7 +198,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
       disk_inode->magic = INODE_MAGIC;
         static char zeros[BLOCK_SECTOR_SIZE];
 
-		block_sector_t * block_arr = &(disk_inode->direct_blocks);
+		block_sector_t * block_arr = disk_inode->direct_blocks;
 		size_t block_arr_len = min (DIRECT_BLOCK_NUM, sectors);
 
 		if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
@@ -206,13 +211,13 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 
 		int i = 0;
 		for (i = 0; i < INDIRECT_BLOCK_NUM; i ++) {
-			if (!free_map_allocate (1, &disk_inode->indirect_blocks[i])) {
+			if (!free_map_allocate (1, &(disk_inode->indirect_blocks[i]))) {
 				goto revert;
 			}
 			block_write (fs_device, disk_inode->indirect_blocks[i], zeros);
 
 			block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
-			block_arr = &direct_block_arr;
+			block_arr = direct_block_arr;
 			block_arr_len = min (INDIRECT_BLOCK_SIZE, sectors);
 			if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
 				goto revert;
@@ -227,7 +232,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 
 		int j = 0;
 		for (i = 0; i < D_INDIRECT_BLOCK_NUM; i ++) {
-			if (!free_map_allocate (1, &disk_inode->d_indirect_blocks[i])) {
+			if (!free_map_allocate (1, &(disk_inode->d_indirect_blocks[i]))) {
 				goto revert;
 			}
 			block_write (fs_device, disk_inode->d_indirect_blocks[i], zeros);
@@ -235,7 +240,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 
 			for (j = 0; j < INDIRECT_BLOCK_SIZE; j ++) {
 				block_sector_t direct_block_arr[INDIRECT_BLOCK_SIZE];
-				block_arr = &direct_block_arr;
+				block_arr = direct_block_arr;
 				block_arr_len = min (INDIRECT_BLOCK_SIZE, sectors);
 				if (allocate_block_array (block_arr, block_arr_len) < block_arr_len) {
 					goto revert;
