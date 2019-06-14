@@ -75,7 +75,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
         uint32_t d_indirect_relative = indirect_relative - INDIRECT_BLOCK_NUM * (BLOCK_SECTOR_SIZE / sizeof (block_sector_t) * BLOCK_SECTOR_SIZE);
         block_sector_t indirect_blocks[INDIRECT_BLOCK_SIZE];
         block_read (fs_device,
-                    inode->data.indirect_blocks[d_indirect_relative/(INDIRECT_BLOCK_SIZE * INDIRECT_BLOCK_SIZE * BLOCK_SECTOR_SIZE)],
+                    inode->data.d_indirect_blocks[d_indirect_relative/(INDIRECT_BLOCK_SIZE * INDIRECT_BLOCK_SIZE * BLOCK_SECTOR_SIZE)],
                     indirect_blocks);       
         block_sector_t direct_blocks[INDIRECT_BLOCK_SIZE];
         block_read (fs_device,
