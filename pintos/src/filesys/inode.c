@@ -237,7 +237,7 @@ bool grow_block_rec (block_sector_t * block_arr, size_t block_arr_len, size_t* s
 		if (sector_cnt > sector_new_length) {
 			return true;
 		}
-		
+
 		block_sector_t child_block_arr[INDIRECT_BLOCK_SIZE];
 		block_sector_t child_block_arr_len = INDIRECT_BLOCK_SIZE;
 		if (block_arr[i] != 0) {
@@ -260,15 +260,15 @@ int grow_inode (struct inode_disk * disk_inode, off_t new_length, block_sector_t
 	size_t sector_cnt = 0;
 	block_arr = disk_inode->direct_blocks;
 	block_arr_len = DIRECT_BLOCK_NUM;
-	grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 0);
-	grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 1);
-	grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 2);
+	if (grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 0)
+	&&	grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 1)
+	&& grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 2)) {
+		return true;
+	}
 
-	return true;
-	rec_revert:
-		//Revert
+	//Revert
 
-		return false;
+	return false;
 }
 
 /* Initializes an inode with LENGTH bytes of data and
