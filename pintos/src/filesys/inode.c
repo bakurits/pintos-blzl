@@ -113,9 +113,9 @@ int allocate_block_array (block_sector_t * arr, size_t size, off_t old_length, o
 	size_t new_sectors = bytes_to_sectors (old_length);
 	size_t old_sectors = bytes_to_sectors (new_length);
 	int success = true;
-	for (i = 0; i < size; i ++) {
+
+	for (i = 0; i < size; i ++, sector_cnt) {
 		if (sector_cnt <= old_sectors) {
-			sector_cnt ++;
 			continue;
 		}
 
@@ -220,11 +220,6 @@ bool grow_block_rec (block_sector_t * block_arr, size_t block_arr_len, size_t* s
 	size_t sector_old_length = bytes_to_sectors (old_length);
 	size_t sector_new_length = bytes_to_sectors (new_length);
 	int status = 0;
-	if (cur_interval_end < sector_old_length) {
-		*sector_cnt_ptr = cur_interval_end;
-		return true;
-	}
-
 	if (rec_depth == 0) {
 		status = allocate_block_array (block_arr, block_arr_len, old_length, new_length, sector_cnt_ptr);
 		
@@ -242,9 +237,12 @@ bool grow_block_rec (block_sector_t * block_arr, size_t block_arr_len, size_t* s
 		if (sector_cnt > sector_new_length) {
 			return true;
 		}
+		
 		block_sector_t child_block_arr[INDIRECT_BLOCK_SIZE];
 		block_sector_t child_block_arr_len = INDIRECT_BLOCK_SIZE;
-		block_read (fs_device, block_arr[i], child_block_arr);
+		if (block_arr[i] != 0) {
+			block_read (fs_device, block_arr[i], child_block_arr);
+		}
 		status = grow_block_rec (child_block_arr, child_block_arr_len, sector_cnt_ptr, old_length, new_length, rec_depth - 1);
 		block_write (fs_device, block_arr[i], child_block_arr);
 		if (!status) {
