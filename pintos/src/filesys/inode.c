@@ -41,10 +41,11 @@ bytes_to_sectors (off_t size)
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
 
+static char zeros[BLOCK_SECTOR_SIZE];
 static bool deallocate_block_array (block_sector_t * arr, size_t size);
 static int allocate_block_array (block_sector_t * arr, size_t size, off_t old_length, off_t new_length, size_t* sector_cnt_ptr);
 static void deallocate_inode_on_disk (struct inode_disk * disk_inode, block_sector_t* block_arr, size_t block_arr_len);
-int grow_inode (struct inode_disk * disk_inode, off_t new_length, block_sector_t * block_arr, size_t block_arr_len);
+int grow_inode (struct inode_disk * disk_inode, off_t new_length);
 /* In-memory inode. */
 struct inode
   {
@@ -107,15 +108,28 @@ inode_init (void)
   buffer_cache_test();
 }
 
+#define n 1
+int arr1[n];
+int arr2[n];
+int cnt = 0;
+
 int allocate_block_array (block_sector_t * arr, size_t size, off_t old_length, off_t new_length, size_t* sector_cnt_ptr) {
 	int i = 0;
 	size_t sector_cnt = *sector_cnt_ptr;
-	size_t new_sectors = bytes_to_sectors (old_length);
-	size_t old_sectors = bytes_to_sectors (new_length);
+	size_t old_sectors = bytes_to_sectors (old_length);
+	size_t new_sectors = bytes_to_sectors (new_length);
 	int success = true;
+	// if (cnt == n) {
+	// 	PANIC ("%d %d\n",
+	// 	arr1[0], arr2[0]);
+	// }
+	// arr1[cnt] = old_sectors;
+	// arr2[cnt] = new_sectors;
+	// cnt ++;
+	// PANIC ("%d %d\n", (int)old_sectors, (int)new_sectors);
 
 	for (i = 0; i < size; i ++, sector_cnt) {
-		if (sector_cnt <= old_sectors) {
+		if (sector_cnt < old_sectors) {
 			continue;
 		}
 
@@ -127,6 +141,7 @@ int allocate_block_array (block_sector_t * arr, size_t size, off_t old_length, o
 			success = false;
 			break;
 		}
+		block_write (fs_device, arr[i], zeros);
 	}
 
 	*sector_cnt_ptr = sector_cnt;
@@ -228,7 +243,8 @@ bool grow_block_rec (block_sector_t * block_arr, size_t block_arr_len, size_t* s
 		}
 	}
 
-	for (int i = 0; i < block_arr_len; i ++) {
+	int i = 0;
+	for (i = 0; i < block_arr_len; i ++) {	
 		cur_interval_end = *sector_cnt_ptr + pow (INDIRECT_BLOCK_SIZE, rec_depth - 1);
 		if (cur_interval_end < sector_old_length) {
 			*sector_cnt_ptr = cur_interval_end;
@@ -239,9 +255,15 @@ bool grow_block_rec (block_sector_t * block_arr, size_t block_arr_len, size_t* s
 		}
 
 		block_sector_t child_block_arr[INDIRECT_BLOCK_SIZE];
+		memcpy (child_block_arr, zeros, BLOCK_SECTOR_SIZE);
 		block_sector_t child_block_arr_len = INDIRECT_BLOCK_SIZE;
 		if (block_arr[i] != 0) {
 			block_read (fs_device, block_arr[i], child_block_arr);
+
+		} else {
+			if (!free_map_allocate (1, &(block_arr[i]))) {
+				return false;
+			}
 		}
 		status = grow_block_rec (child_block_arr, child_block_arr_len, sector_cnt_ptr, old_length, new_length, rec_depth - 1);
 		block_write (fs_device, block_arr[i], child_block_arr);
@@ -253,16 +275,12 @@ bool grow_block_rec (block_sector_t * block_arr, size_t block_arr_len, size_t* s
 	return true;
 }
 
-int grow_inode (struct inode_disk * disk_inode, off_t new_length, block_sector_t * block_arr, size_t block_arr_len) {
-	static char zeros[BLOCK_SECTOR_SIZE];
-
+int grow_inode (struct inode_disk * disk_inode, off_t new_length) {
 	off_t old_length = disk_inode->length;
 	size_t sector_cnt = 0;
-	block_arr = disk_inode->direct_blocks;
-	block_arr_len = DIRECT_BLOCK_NUM;
-	if (grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 0)
-	&&	grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 1)
-	&& grow_block_rec (block_arr, block_arr_len, &sector_cnt, old_length, new_length, 2)) {
+	if (grow_block_rec (disk_inode->direct_blocks, DIRECT_BLOCK_NUM, &sector_cnt, old_length, new_length, 0)
+	&&	grow_block_rec (disk_inode->indirect_blocks, INDIRECT_BLOCK_NUM, &sector_cnt, old_length, new_length, 1)
+	&& 	grow_block_rec (disk_inode->d_indirect_blocks, D_INDIRECT_BLOCK_NUM, &sector_cnt, old_length, new_length, 2)) {
 		return true;
 	}
 
@@ -297,9 +315,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 	disk_inode->is_dir = is_dir;
 	disk_inode->magic = INODE_MAGIC;
 
-	block_sector_t * block_arr;
-	size_t block_arr_len;
-	if (!grow_inode (disk_inode, length, block_arr, block_arr_len)) {
+	if (!grow_inode (disk_inode, length)) {
 		goto revert;
 	}
 
@@ -309,7 +325,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_dir)
 	return true;
 
 	revert :
-		deallocate_inode_on_disk (disk_inode, block_arr, block_arr_len);
+		// deallocate_inode_on_disk (disk_inode, block_arr, block_arr_len);
 
 		// Free structure
 		free (disk_inode);
@@ -385,7 +401,6 @@ inode_close (struct inode *inode)
       list_remove (&inode->elem);
 
       /* Deallocate blocks if removed. */
-      //DASAWERIA
       if (inode->removed)
         {
 		deallocate_inode_on_disk (&(inode->data), NULL, 0);
