@@ -128,7 +128,7 @@ int allocate_block_array (block_sector_t * arr, size_t size, off_t old_length, o
 	// cnt ++;
 	// PANIC ("%d %d\n", (int)old_sectors, (int)new_sectors);
 
-	for (i = 0; i < size; i ++, sector_cnt) {
+	for (i = 0; i < size; i ++, sector_cnt ++) {
 		if (sector_cnt < old_sectors) {
 			continue;
 		}
