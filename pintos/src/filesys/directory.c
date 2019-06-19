@@ -50,9 +50,8 @@ struct dir *dir_open_root(void) {
    Return true if successful, false on failure. */
 struct dir *dir_open_path(struct dir *cwd, char *path) {
   if (path == NULL) return NULL;
-  if (strlen(path) == 0) return dir_open_root();
   struct dir *cur;
-  if (path[0] == '/') {
+  if (strlen(path) > 0 && path[0] == '/') {
     cur = dir_open_root();
   } else {
     if (cwd != NULL)
@@ -61,11 +60,15 @@ struct dir *dir_open_path(struct dir *cwd, char *path) {
       cur = dir_open_root();
   }
   const char *path_left = path;
+  
 
   while (true) {
     char cur_file[NAME_MAX + 1];
     int res = get_next_part(cur_file, &path_left);
-    if (res == -1) return NULL;
+    if (res == -1) {
+      dir_close(cur);
+      return NULL;
+    }
     if (res == 0) break;
     struct inode *inode = NULL;
     if (!dir_lookup(cur, cur_file, &inode)) {

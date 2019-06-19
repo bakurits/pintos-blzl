@@ -44,7 +44,7 @@ static int split_file_path(const char *whole_path, char *dir, char *file) {
   int i;
   for (i = n - 1; i >= 0; i--) {
     if (whole_path[i] == '/') {
-      strlcpy(dir, whole_path, i + 1);
+      strlcpy(dir, whole_path, i + 2);
       strlcpy(file, &whole_path[i + 1], n - i + 1);
       return true;
     }
@@ -102,11 +102,18 @@ struct file *filesys_open(const char *name) {
 
   split_file_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
+
   struct inode *inode = NULL;
-
-  if (dir != NULL) dir_lookup(dir, file_name, &inode);
-  dir_close(dir);
-
+  if (dir == NULL) return NULL;
+  if (strlen(file_name) == 0) {
+    inode = dir_get_inode(dir);
+    dir_close(dir);
+  } else {
+    if (!dir_lookup(dir, file_name, &inode)) {
+      dir_close(dir);
+      return NULL;
+    }
+  }
   return file_open(inode);
 }
 
@@ -124,6 +131,8 @@ bool filesys_remove(const char *name) {
     dir_close(dir);
     return false;
   }
+
+  
 
   struct inode *parent_inode = NULL;
   if (!dir_lookup(dir, "..", &parent_inode)) goto error;

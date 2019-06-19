@@ -35,6 +35,7 @@ struct child_info_t {
 
 struct file_info_t {
   int fd;
+  bool is_dir;
   struct list_elem elem;
   struct file *file_data;
 };

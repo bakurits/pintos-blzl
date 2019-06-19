@@ -351,6 +351,7 @@ int _open(const char *file) {
   struct file_info_t *cur_file_info =
       (struct file_info_t *)malloc(sizeof(struct file_info_t));
   cur_file_info->fd = new_fd;
+  cur_file_info->is_dir = inode_is_dir(cur_file_data->inode);
   cur_file_info->file_data = cur_file_data;
 
   res = new_fd;
@@ -390,6 +391,7 @@ int _read(int fd, void *buffer, unsigned size) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
+  if (file->is_dir) return -1;
 
   // lock_acquire(&filesys_lock);
   int res = file_read(file->file_data, buffer, size);
@@ -408,8 +410,7 @@ int _write(int fd, const void *buffer, unsigned size) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  struct inode *inode = file->file_data->inode;
-  if (inode_is_dir(inode)) return -1;
+  if (file->is_dir) return -1;
 
   // lock_acquire(&filesys_lock);
   int res = file_write(file->file_data, buffer, size);
