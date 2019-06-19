@@ -44,9 +44,8 @@ static int split_file_path(const char *whole_path, char *dir, char *file) {
   int i;
   for (i = n - 1; i >= 0; i--) {
     if (whole_path[i] == '/') {
-      strlcpy(dir, whole_path, i);
-      dir[i] = '\0';
-      strlcpy(file, &whole_path[i + 1], n - i);
+      strlcpy(dir, whole_path, i + 1);
+      strlcpy(file, &whole_path[i + 1], n - i + 1);
       return true;
     }
   }
@@ -105,7 +104,7 @@ struct file *filesys_open(const char *name) {
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
   struct inode *inode = NULL;
 
-  if (dir != NULL) dir_lookup(dir, name, &inode);
+  if (dir != NULL) dir_lookup(dir, file_name, &inode);
   dir_close(dir);
 
   return file_open(inode);

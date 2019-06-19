@@ -57,13 +57,27 @@ static bool valid_ptr(void *ptr, int size) {
   return true;
 }
 
-syscall_func_t syscall_func_arr[21] = {
-    syscall_halt,    syscall_exit,     syscall_exec,   syscall_wait,
-    syscall_create,  syscall_remove,   syscall_open,   syscall_filesize,
-    syscall_read,    syscall_write,    syscall_seek,   syscall_tell,
-    syscall_close,   syscall_practice, NULL, NULL, syscall_chdir,
-    syscall_mkdir, syscall_readdir, syscall_isdir,    syscall_inumber
-    };
+syscall_func_t syscall_func_arr[21] = {syscall_halt,
+                                       syscall_exit,
+                                       syscall_exec,
+                                       syscall_wait,
+                                       syscall_create,
+                                       syscall_remove,
+                                       syscall_open,
+                                       syscall_filesize,
+                                       syscall_read,
+                                       syscall_write,
+                                       syscall_seek,
+                                       syscall_tell,
+                                       syscall_close,
+                                       syscall_practice,
+                                       NULL,
+                                       NULL,
+                                       syscall_chdir,
+                                       syscall_mkdir,
+                                       syscall_readdir,
+                                       syscall_isdir,
+                                       syscall_inumber};
 
 static void syscall_handler(struct intr_frame *f UNUSED) {
   uint32_t *args = ((uint32_t *)f->esp);
@@ -296,7 +310,7 @@ int _wait(pid_t pid) {
 
 bool _create(const char *file, unsigned initial_size) {
   // lock_acquire(&filesys_lock);
-  bool res = filesys_create(file, initial_size, 0);
+  bool res = filesys_create(file, initial_size, File);
   // lock_release(&filesys_lock);
   return res;
 }
@@ -453,8 +467,7 @@ bool _chdir(const char *dir) {
   return true;
 }
 
-bool _mkdir(const char *dir) { 
-  return filesys_create(dir, 0, Directory); }
+bool _mkdir(const char *dir) { return filesys_create(dir, 0, Directory); }
 
 bool _readdir(int fd, char *name) {
   struct list_elem *e = get_file_list_elem(fd);
