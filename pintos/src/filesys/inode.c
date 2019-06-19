@@ -422,12 +422,15 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size,
                     off_t offset) {
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-	// printf ("inode block %u\n", inode->sector);
+	// printf ("Read inode block %u\n", inode->sector);
 	// printf ("offset %d, size %d\n", (int)offset, (int)size);
 	// printf ("%lld\n", (long long)inode->data.length);
 
 
   while (size > 0) {
+		// printf ("R, Block %d, In loop size - %d, ofs - %d, bytes read %d\n", inode->sector, size, offset, bytes_read);
+		// printf ("%d %d", inode->deny_write_cnt, inode->data.length);
+
     /* Disk sector to read, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
     int sector_ofs = offset % BLOCK_SECTOR_SIZE;
@@ -466,15 +469,22 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt) return 0;
 
-	// printf ("%p\n", inode);
+
+	// printf ("Write inode block %u\n", inode->sector);
+	// printf ("Write offset %d, write size %d\n", offset, size);
   if (inode->data.length < size + offset) {	
 	  int old_len = inode->data.length;
-    grow_inode(&(inode->data), size + offset);
+    if (!grow_inode(&(inode->data), size + offset)) {
+				reduce_inode (&(inode->data), inode->data.length);
+				// printf ("Grow failed in write\n");
+				return -1;
+		}
+		block_write(fs_device, inode->sector, &(inode->data));
 		// printf ("Write growth %d -> %d\n", old_len, inode->data.length);
   }
-	// printf ("Write offset %d, write size %d\n", offset, size);
 
   while (size > 0) {
+		// printf ("W, Block %d, In loop size - %d, ofs - %d, bytes written %d\n", inode->sector, size, offset, bytes_written);
     /* Sector to write, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
     int sector_ofs = offset % BLOCK_SECTOR_SIZE;
@@ -489,7 +499,8 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size,
     if (chunk_size <= 0) break;
 
     buffer_cache_write(sector_idx, buffer + bytes_written, chunk_size,
-                       sector_ofs);
+                    	   sector_ofs);
+		// printf ("Written\n");
 
     /* Advance. */
     size -= chunk_size;
