@@ -160,6 +160,7 @@ void deallocate_block_array (block_sector_t * arr, size_t size, off_t length, si
 			break;
 		}
 		block_write (fs_device, arr[i], zeros);
+		arr[i] = 0;
 	}
 
 	*sector_cnt_ptr = sector_cnt;
@@ -265,6 +266,7 @@ void reduce_blocks_rec (block_sector_t *block_arr, size_t block_arr_len,
     }
 
     free_map_release (block_arr[i], 1);
+		block_arr[i] = 0;
   }
 
   return true;
@@ -428,8 +430,10 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size,
 
 
   while (size > 0) {
-		// printf ("R, Block %d, In loop size - %d, ofs - %d, bytes read %d\n", inode->sector, size, offset, bytes_read);
-		// printf ("%d %d", inode->deny_write_cnt, inode->data.length);
+	  // if (bytes_read + offset >= 125*BLOCK_SECTOR_SIZE) {
+		// 	printf ("R, Block %d, In loop size - %d, ofs - %d, bytes read %d\n", inode->sector, size, offset, bytes_read);
+		// 	printf ("%d %d", inode->deny_write_cnt, inode->data.length);
+	  // }
 
     /* Disk sector to read, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
@@ -484,8 +488,10 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size,
   }
 
   while (size > 0) {
-		// printf ("W, Block %d, In loop size - %d, ofs - %d, bytes written %d\n", inode->sector, size, offset, bytes_written);
-    /* Sector to write, starting byte offset within sector. */
+	  // if (bytes_written + offset >= 126*BLOCK_SECTOR_SIZE) {
+		// 	printf ("W, Block %d, In loop size - %d, ofs - %d, bytes written %d\n", inode->sector, size, offset, bytes_written);
+		// }
+		/* Sector to write, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
     int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
