@@ -67,6 +67,7 @@ struct dir *dir_open_path(struct dir *cwd, char *path) {
     char cur_file[NAME_MAX + 1];
     int res = get_next_part(cur_file, &path_left);
     if (res == -1) return NULL;
+    if (res == 0) break;
     struct inode *inode = NULL;
     if (!dir_lookup(cur, cur_file, &inode)) {
       dir_close(cur);
@@ -79,7 +80,6 @@ struct dir *dir_open_path(struct dir *cwd, char *path) {
     }
     dir_close(cur);
     cur = next;
-    if (res == 0) break;
   }
   return cur;
 }
@@ -117,14 +117,16 @@ static bool lookup(const struct dir *dir, const char *name,
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
-
+  printf("lookup started\n");
   for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e)
+       ofs += sizeof e) {
+    printf("current : %s tofind : %s\n", e.name, name);
     if (e.in_use && !strcmp(name, e.name)) {
       if (ep != NULL) *ep = e;
       if (ofsp != NULL) *ofsp = ofs;
       return true;
     }
+  }
   return false;
 }
 
@@ -226,8 +228,8 @@ bool dir_readdir(struct dir *dir, char name[NAME_MAX + 1]) {
   struct dir_entry e;
 
   // skip '.' and '..'
-  if (dir->pos < 2*sizeof(struct dir_entry))
-    dir->pos = 2*sizeof(struct dir_entry);
+  if (dir->pos < 2 * sizeof(struct dir_entry))
+    dir->pos = 2 * sizeof(struct dir_entry);
 
   while (inode_read_at(dir->inode, &e, sizeof e, dir->pos) == sizeof e) {
     dir->pos += sizeof e;

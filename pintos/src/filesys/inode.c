@@ -15,10 +15,10 @@
 #define INDIRECT_BLOCK_NUM (unsigned)1
 #define D_INDIRECT_BLOCK_NUM (unsigned)1
 #define INDIRECT_BLOCK_SIZE (BLOCK_SECTOR_SIZE / sizeof(block_sector_t))
-#define MAXIMUM_NUMBER_OF_BLOCKS                 \
-  (DIRECT_BLOCK_NUM +                             \
-      INDIRECT_BLOCK_SIZE *(INDIRECT_BLOCK_NUM + \
-                            D_INDIRECT_BLOCK_NUM * INDIRECT_BLOCK_SIZE))
+#define MAXIMUM_NUMBER_OF_BLOCKS \
+  (DIRECT_BLOCK_NUM +            \
+   INDIRECT_BLOCK_SIZE *         \
+       (INDIRECT_BLOCK_NUM + D_INDIRECT_BLOCK_NUM * INDIRECT_BLOCK_SIZE))
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk {
@@ -63,7 +63,7 @@ struct inode {
 static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
   ASSERT(inode != NULL);
   if (pos >= inode->data.length) return -1;
-  
+
   if (pos < BLOCK_SECTOR_SIZE * DIRECT_BLOCK_NUM) {
     return inode->data.direct_blocks[pos / BLOCK_SECTOR_SIZE];
   }
@@ -72,20 +72,23 @@ static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
                               (BLOCK_SECTOR_SIZE / sizeof(block_sector_t)) *
                               BLOCK_SECTOR_SIZE) {
     block_sector_t direct_blocks[INDIRECT_BLOCK_SIZE];
-//     printf ("pos %d\n", pos);
-//     printf ("rel %d\n", indirect_relative);
-//     printf ("division %d\n",  (int)(indirect_relative / BLOCK_SECTOR_SIZE));
-// printf("block in indirect  %d\n", (int)(indirect_relative / BLOCK_SECTOR_SIZE) /
-//                          INDIRECT_BLOCK_SIZE);
+    //     printf ("pos %d\n", pos);
+    //     printf ("rel %d\n", indirect_relative);
+    //     printf ("division %d\n",  (int)(indirect_relative /
+    //     BLOCK_SECTOR_SIZE));
+    // printf("block in indirect  %d\n", (int)(indirect_relative /
+    // BLOCK_SECTOR_SIZE) /
+    //                          INDIRECT_BLOCK_SIZE);
 
-// printf("block itself  %d\n", (int)(indirect_relative / BLOCK_SECTOR_SIZE) %
-//                          INDIRECT_BLOCK_SIZE);
+    // printf("block itself  %d\n", (int)(indirect_relative / BLOCK_SECTOR_SIZE)
+    // %
+    //                          INDIRECT_BLOCK_SIZE);
     block_read(
         fs_device,
         inode->data.indirect_blocks[(indirect_relative / BLOCK_SECTOR_SIZE) /
                                     INDIRECT_BLOCK_SIZE],
         direct_blocks);
-    
+
     return direct_blocks[(indirect_relative / BLOCK_SECTOR_SIZE) %
                          INDIRECT_BLOCK_SIZE];
   }
@@ -136,7 +139,8 @@ int allocate_block_array(block_sector_t *arr, size_t size, off_t old_length,
   size_t old_sectors = bytes_to_sectors(old_length);
   size_t new_sectors = bytes_to_sectors(new_length);
   int success = true;
-  // printf("Allocating %d %d %d\n  ", old_sectors, new_sectors, *sector_cnt_ptr);
+  // printf("Allocating %d %d %d\n  ", old_sectors, new_sectors,
+  // *sector_cnt_ptr);
 
   for (i = 0; i < size; i++, sector_cnt++) {
     if (sector_cnt < old_sectors) {
@@ -248,7 +252,7 @@ bool grow_block_rec(block_sector_t *block_arr, size_t block_arr_len,
   size_t sector_new_length = bytes_to_sectors(new_length);
   int status = 0;
   // printf("In Rec %d %d %d %d\n", sector_old_length, sector_new_length,
-        //  *sector_cnt_ptr, rec_depth);
+  //  *sector_cnt_ptr, rec_depth);
   if (rec_depth == 0) {
     status = allocate_block_array(block_arr, block_arr_len, old_length,
                                   new_length, sector_cnt_ptr);
