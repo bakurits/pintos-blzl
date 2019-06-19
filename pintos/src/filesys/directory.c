@@ -50,7 +50,7 @@ struct dir *dir_open_root(void) {
    Return true if successful, false on failure. */
 struct dir *dir_open_path(struct dir *cwd, char *path) {
   if (path == NULL) return NULL;
-
+  if (strlen(path) == 0) return dir_open_root();
   struct dir *cur;
   if (path[0] == '/') {
     cur = dir_open_root();
@@ -60,7 +60,6 @@ struct dir *dir_open_path(struct dir *cwd, char *path) {
     else
       cur = dir_open_root();
   }
-  if (strlen(path) == 0) return cur;
   const char *path_left = path;
 
   while (true) {
@@ -237,6 +236,14 @@ bool dir_readdir(struct dir *dir, char name[NAME_MAX + 1]) {
     }
   }
   return false;
+}
+
+bool dir_is_empty(struct dir *dir) {
+  char name[NAME_MAX + 1];
+  int cnt = 0;
+  while (dir_readdir (dir, name))
+    cnt++;
+  return cnt <= 2;
 }
 
 /* Extracts a file name part from *SRCP into PART, and updates *SRCP so that the

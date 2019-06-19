@@ -120,10 +120,40 @@ bool filesys_remove(const char *name) {
 
   split_file_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
-  bool success = dir != NULL && dir_remove(dir, name);
-  dir_close(dir);
+  if (dir == NULL || inode_is_dir(dir_get_inode(dir))) {
+    dir_close(dir);
+    return false;
+  }
 
-  return success;
+  struct inode *parent_inode = NULL;
+  if (!dir_lookup(dir, "..", &parent_inode)) goto error;
+
+  struct inode *inode = dir_get_inode(dir);
+
+  if (inode_is_opened(inode)) goto error;
+
+  if (inode_is_dir(inode)) {
+    // if deleting directory
+    if (!dir_is_empty(dir)) goto error;
+    struct dir *par_dir = dir_open(parent_inode);
+    if (par_dir == NULL || dir_get_inode(par_dir) == dir_get_inode(dir)) {
+      dir_close(par_dir);
+      goto error;
+    }
+    bool success = dir_remove(par_dir, file_name);
+    dir_close(par_dir);
+    dir_close(dir);
+    return success;
+  } else {
+    // if deleting file
+    bool success = dir != NULL && dir_remove(dir, file_name);
+    dir_close(dir);
+    return success;
+  }
+
+error:
+  dir_close(dir);
+  return false;
 }
 
 /* Formats the file system. */

@@ -522,3 +522,6 @@ off_t inode_length(const struct inode *inode) { return inode->data.length; }
 
 /* Returns true if inode represents directory */
 bool inode_is_dir(struct inode *inode) { return inode->data.is_dir; }
+
+/* Returns true if inode is opened */
+bool inode_is_opened(struct inode *inode) { return inode->open_cnt > 0; }
