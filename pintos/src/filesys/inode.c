@@ -69,7 +69,7 @@ static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
   }
   uint32_t indirect_relative = pos - BLOCK_SECTOR_SIZE * DIRECT_BLOCK_NUM;
   if (indirect_relative < INDIRECT_BLOCK_NUM *
-                              (BLOCK_SECTOR_SIZE / sizeof(block_sector_t)) *
+                              INDIRECT_BLOCK_SIZE *
                               BLOCK_SECTOR_SIZE) {
     block_sector_t direct_blocks[INDIRECT_BLOCK_SIZE];
     block_read(
@@ -127,7 +127,7 @@ int allocate_block_array(block_sector_t *arr, size_t size, off_t old_length,
   // *sector_cnt_ptr);
 
   for (i = 0; i < size; i++, sector_cnt++) {
-    if (sector_cnt < old_sectors) {
+    if (arr[i] != 0) {
       continue;
     }
 
@@ -199,14 +199,10 @@ bool grow_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
 
   size_t i;
   for (i = 0; i < block_arr_len; i++) {
-    cur_interval_end =
-        *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth - 1);
-    if (cur_interval_end < sector_old_length) {
-      *sector_cnt_ptr = cur_interval_end;
-      continue;
-    }
-    if (*sector_cnt_ptr > sector_new_length) {
-      return true;
+		cur_interval_end = *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth);
+    if (cur_interval_end < sector_old_length || *sector_cnt_ptr > sector_new_length) {
+			*sector_cnt_ptr = cur_interval_end;
+			continue;
     }
 
     block_sector_t child_block_arr[INDIRECT_BLOCK_SIZE];
@@ -227,8 +223,8 @@ bool grow_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
     if (!status) {
       return false;
     }
-  }
-
+			}
+  
   return true;
 }
 
@@ -248,7 +244,7 @@ void reduce_blocks_rec (block_sector_t *block_arr, size_t block_arr_len,
   size_t i;
   for (i = 0; i < block_arr_len; i++) {
     cur_interval_end =
-        *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth - 1);
+        *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth);
     if (cur_interval_end < length_in_sectors) {
       *sector_cnt_ptr = cur_interval_end;
       continue;
