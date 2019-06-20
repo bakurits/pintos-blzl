@@ -14,6 +14,14 @@ struct block *fs_device;
 
 static void do_format(void);
 
+
+static void print_dirs(struct dir* dir) {
+  printf("Printing dir content\n");
+  char name[NAME_MAX + 1];
+  while (dir_readdir (dir, name))
+    printf ("%s\n", name);
+}
+
 /* Initializes the file system module.
    If FORMAT is true, reformats the file system. */
 void filesys_init(bool format) {
@@ -68,6 +76,7 @@ bool filesys_create(const char *name, off_t initial_size,
 
   split_file_path(name, dir_path, file_name);
 
+  //printf("create %s\n", name);
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
 
   bool success = (dir != NULL && free_map_allocate(1, &inode_sector));
@@ -78,11 +87,12 @@ bool filesys_create(const char *name, off_t initial_size,
     struct dir *new_dir = dir_open(inode_open(inode_sector));
     dir_add(new_dir, "..", inode_get_inumber(dir_get_inode(dir)));
     dir_add(new_dir, ".", inode_get_inumber(dir_get_inode(new_dir)));
+    dir_close(new_dir);
   } else {
     success = inode_create(inode_sector, initial_size, 0);
   }
   success = success && dir_add(dir, file_name, inode_sector);
-
+  //print_dirs(dir);
 finish:
   if (!success && inode_sector != 0) free_map_release(inode_sector, 1);
 
@@ -102,19 +112,24 @@ struct file *filesys_open(const char *name) {
 
   split_file_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
-
-  struct inode *inode = NULL;
+  
+  struct file* res = NULL;
   if (dir == NULL) return NULL;
   if (strlen(file_name) == 0) {
-    inode = dir_get_inode(dir);
-    dir_close(dir);
+    struct inode *inode = dir_get_inode(dir);
+    if (inode == NULL) return NULL;
+    res = file_open(inode);    
   } else {
+    struct inode *inode = NULL;
     if (!dir_lookup(dir, file_name, &inode)) {
       dir_close(dir);
       return NULL;
     }
+    res = file_open(inode);
   }
-  return file_open(inode);
+  dir_close(dir);
+  if (res == NULL) return NULL;
+  return res;
 }
 
 /* Deletes the file named NAME.
@@ -126,42 +141,44 @@ bool filesys_remove(const char *name) {
   char file_name[NAME_MAX + 1];
 
   split_file_path(name, dir_path, file_name);
-  struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
-  if (dir == NULL || inode_is_dir(dir_get_inode(dir))) {
-    dir_close(dir);
+  struct dir *parent_dir = dir_open_path(thread_current()->cwd, dir_path);
+
+  //printf("dir : %s file %s %p\n", dir_path, file_name, parent_dir);
+  if (parent_dir == NULL) {
+    dir_close(parent_dir);
     return false;
   }
-
+  struct inode *inode = NULL;
+  if (!dir_lookup(parent_dir, file_name, &inode)) goto error;
   
-
-  struct inode *parent_inode = NULL;
-  if (!dir_lookup(dir, "..", &parent_inode)) goto error;
-
-  struct inode *inode = dir_get_inode(dir);
-
-  if (inode_is_opened(inode)) goto error;
-
   if (inode_is_dir(inode)) {
     // if deleting directory
-    if (!dir_is_empty(dir)) goto error;
-    struct dir *par_dir = dir_open(parent_inode);
-    if (par_dir == NULL || dir_get_inode(par_dir) == dir_get_inode(dir)) {
-      dir_close(par_dir);
+    
+    if (inode_is_opened(inode)) goto error;
+    //printf("dir : %s file %s %p\n", dir_path, file_name, inode);
+    struct dir* dir = dir_open(inode);
+    if (dir == NULL || !dir_is_empty(dir)) {
+      dir_close(dir);
       goto error;
     }
-    bool success = dir_remove(par_dir, file_name);
-    dir_close(par_dir);
+    if (dir_get_inode(dir) == dir_get_inode(parent_dir)) {
+      dir_close(parent_dir);
+      goto error;
+    }
+
+    bool success = dir_remove(parent_dir, file_name);
+    dir_close(parent_dir);
     dir_close(dir);
     return success;
   } else {
     // if deleting file
-    bool success = dir != NULL && dir_remove(dir, file_name);
-    dir_close(dir);
+    bool success = dir_remove(parent_dir, file_name);
+    dir_close(parent_dir);
     return success;
   }
 
 error:
-  dir_close(dir);
+  dir_close(parent_dir);
   return false;
 }
 

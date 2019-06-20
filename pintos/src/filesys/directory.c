@@ -30,6 +30,7 @@ bool dir_create(block_sector_t sector, size_t entry_cnt) {
 struct dir *dir_open(struct inode *inode) {
   struct dir *dir = calloc(1, sizeof *dir);
   if (inode != NULL && dir != NULL) {
+    ASSERT(inode_is_dir(inode));
     dir->inode = inode;
     dir->pos = 0;
     return dir;
@@ -61,7 +62,6 @@ struct dir *dir_open_path(struct dir *cwd, char *path) {
   }
   const char *path_left = path;
   
-
   while (true) {
     char cur_file[NAME_MAX + 1];
     int res = get_next_part(cur_file, &path_left);
@@ -116,7 +116,6 @@ static bool lookup(const struct dir *dir, const char *name,
                    struct dir_entry *ep, off_t *ofsp) {
   struct dir_entry e;
   size_t ofs;
-
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
   for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
@@ -226,7 +225,6 @@ done:
    contains no more entries. */
 bool dir_readdir(struct dir *dir, char name[NAME_MAX + 1]) {
   struct dir_entry e;
-
   // skip '.' and '..'
   if (dir->pos < 2 * sizeof(struct dir_entry))
     dir->pos = 2 * sizeof(struct dir_entry);
@@ -244,9 +242,10 @@ bool dir_readdir(struct dir *dir, char name[NAME_MAX + 1]) {
 bool dir_is_empty(struct dir *dir) {
   char name[NAME_MAX + 1];
   int cnt = 0;
-  while (dir_readdir (dir, name))
+  while (dir_readdir (dir, name)) {
     cnt++;
-  return cnt <= 2;
+  }
+  return cnt == 0;
 }
 
 /* Extracts a file name part from *SRCP into PART, and updates *SRCP so that the

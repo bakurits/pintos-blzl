@@ -352,7 +352,13 @@ int _open(const char *file) {
       (struct file_info_t *)malloc(sizeof(struct file_info_t));
   cur_file_info->fd = new_fd;
   cur_file_info->is_dir = inode_is_dir(cur_file_data->inode);
-  cur_file_info->file_data = cur_file_data;
+  if (cur_file_info->is_dir) {
+    cur_file_info->dir = dir_open(cur_file_data->inode);
+    file_close(cur_file_data);
+  } else {
+    cur_file_info->file_data = cur_file_data;
+  }
+  
 
   res = new_fd;
   // Add new opened file to list of opened files for this thread
@@ -372,6 +378,7 @@ int _filesize(int fd) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   // lock_acquire(&filesys_lock);
+  if (file == NULL || file->is_dir) return 0;
   int res = file_length(file->file_data);
   // lock_release(&filesys_lock);
   return res;
@@ -391,7 +398,7 @@ int _read(int fd, void *buffer, unsigned size) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  if (file->is_dir) return -1;
+  if (file == NULL || file->is_dir) return -1;
 
   // lock_acquire(&filesys_lock);
   int res = file_read(file->file_data, buffer, size);
@@ -410,7 +417,7 @@ int _write(int fd, const void *buffer, unsigned size) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  if (file->is_dir) return -1;
+  if (file == NULL || file->is_dir) return -1;
 
   // lock_acquire(&filesys_lock);
   int res = file_write(file->file_data, buffer, size);
@@ -426,7 +433,8 @@ void _seek(int fd, unsigned position) {
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
 
   // lock_acquire(&filesys_lock);
-  file_seek(file->file_data, position);
+  if (file != NULL && !file->is_dir)
+    file_seek(file->file_data, position);
   // lock_release(&filesys_lock);
 }
 
@@ -437,6 +445,7 @@ unsigned _tell(int fd) {
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
   // lock_acquire(&filesys_lock);
+  if (file == NULL || file->is_dir) return -1;
   unsigned res = file_tell(file->file_data);
   // lock_release(&filesys_lock);
   return res;
@@ -448,9 +457,14 @@ void _close(int fd) {
     return;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-
+  if (file == NULL) return;
+  
   // lock_acquire(&filesys_lock);
-  file_close(file->file_data);
+  if (file->is_dir) {
+    dir_close(file->dir);
+  } else {
+    file_close(file->file_data);
+  }
   // lock_release(&filesys_lock);
   lock_acquire(&thread_current()->files.lock);
   list_remove(&file->elem);
@@ -460,7 +474,7 @@ void _close(int fd) {
 
 bool _chdir(const char *dir) {
   struct dir *new_dir = dir_open_path(thread_current()->cwd, (char *)dir);
-  if (dir == NULL) {
+  if (new_dir == NULL) {
     return false;
   }
   dir_close(thread_current()->cwd);
@@ -476,10 +490,9 @@ bool _readdir(int fd, char *name) {
     return false;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  struct inode *inode = file->file_data->inode;
-  if (!inode_is_dir(inode)) return false;
-  struct dir *dir = dir_open(inode);
-  return dir_readdir(dir, name);
+  if (file == NULL || !file->is_dir) return false;
+  bool success = dir_readdir(file->dir, name);
+  return success;
 }
 
 bool _isdir(int fd) {
@@ -488,7 +501,7 @@ bool _isdir(int fd) {
     return false;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  return inode_is_dir(file->file_data->inode);
+  return (file != NULL && file->is_dir);
 }
 
 int _inumber(int fd) {
