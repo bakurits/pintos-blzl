@@ -578,7 +578,11 @@ static void free_file_list(struct thread *t) {
   while (!list_empty(&t->files.list)) {
     struct list_elem *e = list_pop_back(&t->files.list);
     struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-    file_close(file->file_data);
+    if (file->is_dir) {
+      dir_close(file->dir);
+    } else {
+      file_close(file->file_data);
+    }
     free(file);
   }
   lock_release(&t->files.lock);
