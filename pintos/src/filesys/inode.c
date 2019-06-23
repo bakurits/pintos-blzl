@@ -39,12 +39,18 @@ static inline size_t bytes_to_sectors(off_t size) {
 }
 
 static char zeros[BLOCK_SECTOR_SIZE];
+int pow(int a, int b);
+
 void reduce_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
                        size_t *sector_cnt_ptr, off_t length, int rec_depth);
+bool grow_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
+                     size_t *sector_cnt_ptr, off_t old_length, off_t new_length,
+                     int rec_depth);
 static int allocate_block_array(block_sector_t *arr, size_t size,
-                                off_t old_length, off_t new_length,
-                                size_t *sector_cnt_ptr);
-
+                                off_t new_length, size_t *sector_cnt_ptr);
+void deallocate_block_array(block_sector_t *arr, size_t size, off_t length,
+                            size_t *sector_cnt_ptr);
+void reduce_inode(struct inode_disk *disk_inode, off_t length);
 int grow_inode(struct inode_disk *disk_inode, off_t new_length);
 /* In-memory inode. */
 struct inode {
@@ -115,15 +121,12 @@ void inode_init(void) {
   buffer_cache_test();
 }
 
-int allocate_block_array(block_sector_t *arr, size_t size, off_t old_length,
+int allocate_block_array(block_sector_t *arr, size_t size,
                          off_t new_length, size_t *sector_cnt_ptr) {
-  int i = 0;
+  size_t i = 0;
   size_t sector_cnt = *sector_cnt_ptr;
-  size_t old_sectors = bytes_to_sectors(old_length);
   size_t new_sectors = bytes_to_sectors(new_length);
   int success = true;
-  // printf("Allocating %d %d %d\n  ", old_sectors, new_sectors,
-  // *sector_cnt_ptr);
 
   for (i = 0; i < size; i++, sector_cnt++) {
     if (arr[i] != 0) {
@@ -147,7 +150,7 @@ int allocate_block_array(block_sector_t *arr, size_t size, off_t old_length,
 
 void deallocate_block_array(block_sector_t *arr, size_t size, off_t length,
                             size_t *sector_cnt_ptr) {
-  int i = 0;
+  size_t i = 0;
   size_t sector_cnt = *sector_cnt_ptr;
   size_t length_in_sectors = bytes_to_sectors(length);
 
@@ -192,8 +195,7 @@ bool grow_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
   // printf("In Rec %d %d %d %d\n", sector_old_length, sector_new_length,
   //  *sector_cnt_ptr, rec_depth);
   if (rec_depth == 0) {
-    status = allocate_block_array(block_arr, block_arr_len, old_length,
-                                  new_length, sector_cnt_ptr);
+    status = allocate_block_array(block_arr, block_arr_len, new_length, sector_cnt_ptr);
     return status;
   }
 
@@ -262,8 +264,6 @@ void reduce_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
     free_map_release(block_arr[i], 1);
     block_arr[i] = 0;
   }
-
-  return true;
 }
 
 int grow_inode(struct inode_disk *disk_inode, off_t new_length) {
@@ -472,7 +472,7 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size,
   // printf ("Write inode block %u\n", inode->sector);
   // printf ("Write offset %d, write size %d\n", offset, size);
   if (inode->data.length < size + offset) {
-    int old_len = inode->data.length;
+    // int old_len = inode->data.length;s
     if (!grow_inode(&(inode->data), size + offset)) {
       reduce_inode(&(inode->data), inode->data.length);
       // printf ("Grow failed in write\n");
