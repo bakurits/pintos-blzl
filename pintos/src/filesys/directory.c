@@ -47,6 +47,12 @@ struct dir *dir_open_root(void) {
   return dir_open(inode_open(ROOT_DIR_SECTOR));
 }
 
+static void print_dirs(struct dir *dir) {
+  printf("Printing dir content\n");
+  char name[NAME_MAX + 1];
+  while (dir_readdir(dir, name)) printf("%s\n", name);
+}
+
 /* Opens the directory for given path and returns a directory for it.
    Return true if successful, false on failure. */
 struct dir *dir_open_path(struct dir *cwd, char *path) {
@@ -55,13 +61,12 @@ struct dir *dir_open_path(struct dir *cwd, char *path) {
   if (strlen(path) > 0 && path[0] == '/') {
     cur = dir_open_root();
   } else {
-    if (cwd != NULL)
+    if (cwd != NULL) {
       cur = dir_reopen(cwd);
-    else
+    } else
       cur = dir_open_root();
   }
   const char *path_left = path;
-  
   while (true) {
     char cur_file[NAME_MAX + 1];
     int res = get_next_part(cur_file, &path_left);
@@ -242,7 +247,7 @@ bool dir_readdir(struct dir *dir, char name[NAME_MAX + 1]) {
 bool dir_is_empty(struct dir *dir) {
   char name[NAME_MAX + 1];
   int cnt = 0;
-  while (dir_readdir (dir, name)) {
+  while (dir_readdir(dir, name)) {
     cnt++;
   }
   return cnt == 0;

@@ -339,6 +339,7 @@ int _open(const char *file) {
   // lock_acquire(&filesys_lock);
   // Get file struct of given path
   struct file *cur_file_data = filesys_open(file);
+
   // lock_release(&filesys_lock);
   int res;
 
@@ -346,6 +347,7 @@ int _open(const char *file) {
     res = -1;
     goto done;
   }
+  //printf("Start fd: %d sector: %u\n", new_fd, inode_get_inumber(cur_file_data->inode));
 
   // Fill our struct members
   struct file_info_t *cur_file_info =
@@ -354,10 +356,14 @@ int _open(const char *file) {
   cur_file_info->is_dir = inode_is_dir(cur_file_data->inode);
   if (cur_file_info->is_dir) {
     cur_file_info->dir = dir_open(cur_file_data->inode);
-    file_close(cur_file_data);
+    //printf("Directory fd: %d sector: %u\n", new_fd, inode_get_inumber(dir_get_inode(cur_file_info->dir)));
+    //file_close(cur_file_data);
   } else {
     cur_file_info->file_data = cur_file_data;
+    //printf("File fd: %d sector: %u\n", new_fd, inode_get_inumber(cur_file_data->inode));
   }
+  
+
   
 
   res = new_fd;
@@ -510,5 +516,11 @@ int _inumber(int fd) {
     return -1;
   }
   struct file_info_t *file = list_entry(e, struct file_info_t, elem);
-  return inode_get_inumber(file->file_data->inode);
+  struct inode* inode;
+  if (file->is_dir) {
+    inode = dir_get_inode(file->dir);
+  } else {
+    inode = file->file_data->inode;
+  }
+  return inode_get_inumber(inode);
 }

@@ -68,9 +68,8 @@ static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
     return inode->data.direct_blocks[pos / BLOCK_SECTOR_SIZE];
   }
   uint32_t indirect_relative = pos - BLOCK_SECTOR_SIZE * DIRECT_BLOCK_NUM;
-  if (indirect_relative < INDIRECT_BLOCK_NUM *
-                              INDIRECT_BLOCK_SIZE *
-                              BLOCK_SECTOR_SIZE) {
+  if (indirect_relative <
+      INDIRECT_BLOCK_NUM * INDIRECT_BLOCK_SIZE * BLOCK_SECTOR_SIZE) {
     block_sector_t direct_blocks[INDIRECT_BLOCK_SIZE];
     block_read(
         fs_device,
@@ -200,10 +199,11 @@ bool grow_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
 
   size_t i;
   for (i = 0; i < block_arr_len; i++) {
-		cur_interval_end = *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth);
-    if (cur_interval_end < sector_old_length || *sector_cnt_ptr > sector_new_length) {
-			*sector_cnt_ptr = cur_interval_end;
-			continue;
+    cur_interval_end = *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth);
+    if (cur_interval_end < sector_old_length ||
+        *sector_cnt_ptr > sector_new_length) {
+      *sector_cnt_ptr = cur_interval_end;
+      continue;
     }
 
     block_sector_t child_block_arr[INDIRECT_BLOCK_SIZE];
@@ -224,8 +224,8 @@ bool grow_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
     if (!status) {
       return false;
     }
-			}
-  
+  }
+
   return true;
 }
 
@@ -242,8 +242,7 @@ void reduce_blocks_rec(block_sector_t *block_arr, size_t block_arr_len,
 
   size_t i;
   for (i = 0; i < block_arr_len; i++) {
-    cur_interval_end =
-        *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth);
+    cur_interval_end = *sector_cnt_ptr + pow(INDIRECT_BLOCK_SIZE, rec_depth);
     if (cur_interval_end < length_in_sectors) {
       *sector_cnt_ptr = cur_interval_end;
       continue;

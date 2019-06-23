@@ -142,7 +142,7 @@ static void start_process(void *argv) {
     thread_exit();
   }
   if (t->parent_thread == NULL || t->parent_thread->cwd == NULL) {
-    t->cwd = dir_open_root();
+    t->cwd = NULL;
   } else {
     t->cwd = dir_reopen(t->parent_thread->cwd);
   }

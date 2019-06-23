@@ -75,10 +75,10 @@ bool filesys_create(const char *name, off_t initial_size,
   char file_name[NAME_MAX + 1];
 
   split_file_path(name, dir_path, file_name);
+  if (strlen(file_name) == 0) return false;
 
-  //printf("create %s\n", name);
+  
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
-
   bool success = (dir != NULL && free_map_allocate(1, &inode_sector));
   if (!success) goto finish;
   if (type == Directory) {
@@ -92,7 +92,6 @@ bool filesys_create(const char *name, off_t initial_size,
     success = inode_create(inode_sector, initial_size, 0);
   }
   success = success && dir_add(dir, file_name, inode_sector);
-  //print_dirs(dir);
 finish:
   if (!success && inode_sector != 0) free_map_release(inode_sector, 1);
 
@@ -107,9 +106,10 @@ finish:
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 struct file *filesys_open(const char *name) {
+  if (name == NULL || strlen(name) == 0) return NULL;
   char dir_path[strlen(name)];
   char file_name[NAME_MAX + 1];
-
+  
   split_file_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(thread_current()->cwd, dir_path);
   
@@ -117,7 +117,10 @@ struct file *filesys_open(const char *name) {
   if (dir == NULL) return NULL;
   if (strlen(file_name) == 0) {
     struct inode *inode = dir_get_inode(dir);
-    if (inode == NULL) return NULL;
+    if (inode == NULL) {
+      dir_close(dir);
+      return NULL;
+    } 
     res = file_open(inode);    
   } else {
     struct inode *inode = NULL;
