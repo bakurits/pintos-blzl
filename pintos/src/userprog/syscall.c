@@ -479,11 +479,12 @@ void _close(int fd) {
 }
 
 bool _chdir(const char *dir) {
-  struct dir *new_dir = dir_open_path(thread_current()->cwd, (char *)dir);
+  struct dir* cwd = thread_current()->cwd;
+  
+  struct dir *new_dir = dir_open_path(cwd, (char *)dir);
   if (new_dir == NULL) {
     return false;
   }
-  dir_close(thread_current()->cwd);
   thread_current()->cwd = new_dir;
   return true;
 }

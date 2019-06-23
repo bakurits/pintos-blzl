@@ -289,7 +289,7 @@ int grow_inode(struct inode_disk *disk_inode, off_t new_length) {
 void reduce_inode(struct inode_disk *disk_inode, off_t length) {
   length += BLOCK_SECTOR_SIZE;
   size_t sector_cnt = 0;
-  // printf("\n%d %d\n", disk_inode->length, new_length);
+  // printf("\nreduce_inode %d %d\n", disk_inode->length, length);
   reduce_blocks_rec(disk_inode->direct_blocks, DIRECT_BLOCK_NUM, &sector_cnt,
                     length, 0);
   reduce_blocks_rec(disk_inode->indirect_blocks, INDIRECT_BLOCK_NUM,
